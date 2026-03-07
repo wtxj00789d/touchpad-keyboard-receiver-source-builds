@@ -1,0 +1,26 @@
+﻿{
+  "name": "OBS",
+  "pages": [
+    {
+      "id": "obs-main",
+      "title": "OBS",
+      "rows": 4,
+      "cols": 6,
+      "keys": [
+        {"id":"obs_start_stream","label":"Start Stream","icon":"🔴","action":{"kind":"CMD","payload":"obs:start_stream"},"state_key":"obs_streaming"},
+        {"id":"obs_stop_stream","label":"Stop Stream","icon":"⚫","action":{"kind":"CMD","payload":"obs:stop_stream"},"state_key":"obs_streaming"},
+        {"id":"obs_start_rec","label":"Start Rec","icon":"⏺️","action":{"kind":"CMD","payload":"obs:start_recording"},"state_key":"obs_recording"},
+        {"id":"obs_stop_rec","label":"Stop Rec","icon":"⏹️","action":{"kind":"CMD","payload":"obs:stop_recording"},"state_key":"obs_recording"},
+        {"id":"scene1","label":"Scene1","icon":"1️⃣","action":{"kind":"CMD","payload":"obs:scene:Scene 1"}},
+        {"id":"scene2","label":"Scene2","icon":"2️⃣","action":{"kind":"CMD","payload":"obs:scene:Scene 2"}},
+
+        {"id":"mute_mic","label":"Mic Mute","icon":"🎙️","action":{"kind":"TOGGLE","payload":{"op":"set_mute","value":true}},"hold_action":{"kind":"TOGGLE","payload":{"op":"set_mute","value":false}},"state_key":"mute"},
+        {"id":"push_talk","label":"PTT","icon":"🗣️","action":{"kind":"KEY","payload":"F13"},"hold_action":{"kind":"KEY","payload":"F13"}},
+        {"id":"stinger","label":"Stinger","icon":"✨","action":{"kind":"CMD","payload":"obs:transition:stinger"}},
+        {"id":"fade","label":"Fade","icon":"🌫️","action":{"kind":"CMD","payload":"obs:transition:fade"}},
+        {"id":"marker","label":"Marker","icon":"📍","action":{"kind":"TEXT","payload":"[marker]"}},
+        {"id":"back","label":"Back","icon":"↩️","action":{"kind":"CMD","payload":"switch_layout:Default"}}
+      ]
+    }
+  ]
+}

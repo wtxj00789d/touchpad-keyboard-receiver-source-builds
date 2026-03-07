@@ -1,0 +1,7 @@
+﻿<resources>
+    <color name="flux_bg">#101820</color>
+    <color name="flux_surface">#172A3A</color>
+    <color name="flux_accent">#29A19C</color>
+    <color name="flux_warn">#F7B32B</color>
+    <color name="flux_text">#F8F9FA</color>
+</resources>

@@ -1,0 +1,9 @@
+﻿android_app/local.properties
+
+**/build/
+**/bin/
+**/obj/
+
+**/.venv/
+**/__pycache__/
+*.pyc

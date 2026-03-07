@@ -1,0 +1,82 @@
+﻿{
+  "name": "Default",
+  "pages": [
+    {
+      "id": "keyboard60",
+      "title": "Keyboard 60%",
+      "key_rows": [
+        [
+          {"id":"k_esc","label":"Esc","w":1,"action":{"kind":"KEY","payload":"ESC"}},
+          {"id":"k_grave","label":"`","w":1,"action":{"kind":"KEY","payload":"GRAVE"}},
+          {"id":"k_1","label":"1","w":1,"action":{"kind":"KEY","payload":"1"}},
+          {"id":"k_2","label":"2","w":1,"action":{"kind":"KEY","payload":"2"}},
+          {"id":"k_3","label":"3","w":1,"action":{"kind":"KEY","payload":"3"}},
+          {"id":"k_4","label":"4","w":1,"action":{"kind":"KEY","payload":"4"}},
+          {"id":"k_5","label":"5","w":1,"action":{"kind":"KEY","payload":"5"}},
+          {"id":"k_6","label":"6","w":1,"action":{"kind":"KEY","payload":"6"}},
+          {"id":"k_7","label":"7","w":1,"action":{"kind":"KEY","payload":"7"}},
+          {"id":"k_8","label":"8","w":1,"action":{"kind":"KEY","payload":"8"}},
+          {"id":"k_9","label":"9","w":1,"action":{"kind":"KEY","payload":"9"}},
+          {"id":"k_0","label":"0","w":1,"action":{"kind":"KEY","payload":"0"}},
+          {"id":"k_minus","label":"-","w":1,"action":{"kind":"KEY","payload":"MINUS"}},
+          {"id":"k_equal","label":"=","w":1,"action":{"kind":"KEY","payload":"EQUALS"}},
+          {"id":"k_backspace","label":"Backspace","w":2,"action":{"kind":"KEY","payload":"BACKSPACE"}}
+        ],
+        [
+          {"id":"k_tab","label":"Tab","w":1.5,"action":{"kind":"KEY","payload":"TAB"}},
+          {"id":"k_q","label":"Q","w":1,"action":{"kind":"KEY","payload":"Q"}},
+          {"id":"k_w","label":"W","w":1,"action":{"kind":"KEY","payload":"W"}},
+          {"id":"k_e","label":"E","w":1,"action":{"kind":"KEY","payload":"E"}},
+          {"id":"k_r","label":"R","w":1,"action":{"kind":"KEY","payload":"R"}},
+          {"id":"k_t","label":"T","w":1,"action":{"kind":"KEY","payload":"T"}},
+          {"id":"k_y","label":"Y","w":1,"action":{"kind":"KEY","payload":"Y"}},
+          {"id":"k_u","label":"U","w":1,"action":{"kind":"KEY","payload":"U"}},
+          {"id":"k_i","label":"I","w":1,"action":{"kind":"KEY","payload":"I"}},
+          {"id":"k_o","label":"O","w":1,"action":{"kind":"KEY","payload":"O"}},
+          {"id":"k_p","label":"P","w":1,"action":{"kind":"KEY","payload":"P"}},
+          {"id":"k_lbracket","label":"[","w":1,"action":{"kind":"KEY","payload":"LBRACKET"}},
+          {"id":"k_rbracket","label":"]","w":1,"action":{"kind":"KEY","payload":"RBRACKET"}},
+          {"id":"k_backslash","label":"\\","w":1.5,"action":{"kind":"KEY","payload":"BACKSLASH"}}
+        ],
+        [
+          {"id":"k_caps","label":"Caps","w":1.75,"state_key":"caps_lock","action":{"kind":"KEY","payload":"CAPSLOCK"}},
+          {"id":"k_a","label":"A","w":1,"action":{"kind":"KEY","payload":"A"}},
+          {"id":"k_s","label":"S","w":1,"action":{"kind":"KEY","payload":"S"}},
+          {"id":"k_d","label":"D","w":1,"action":{"kind":"KEY","payload":"D"}},
+          {"id":"k_f","label":"F","w":1,"action":{"kind":"KEY","payload":"F"}},
+          {"id":"k_g","label":"G","w":1,"action":{"kind":"KEY","payload":"G"}},
+          {"id":"k_h","label":"H","w":1,"action":{"kind":"KEY","payload":"H"}},
+          {"id":"k_j","label":"J","w":1,"action":{"kind":"KEY","payload":"J"}},
+          {"id":"k_k","label":"K","w":1,"action":{"kind":"KEY","payload":"K"}},
+          {"id":"k_l","label":"L","w":1,"action":{"kind":"KEY","payload":"L"}},
+          {"id":"k_semicolon","label":";","w":1,"action":{"kind":"KEY","payload":"SEMICOLON"}},
+          {"id":"k_apostrophe","label":"'","w":1,"action":{"kind":"KEY","payload":"APOSTROPHE"}},
+          {"id":"k_enter","label":"Enter","w":2.25,"action":{"kind":"KEY","payload":"ENTER"}}
+        ],
+        [
+          {"id":"k_lshift","label":"Shift","w":2.25,"action":{"kind":"KEY","payload":"LSHIFT"}},
+          {"id":"k_z","label":"Z","w":1,"action":{"kind":"KEY","payload":"Z"}},
+          {"id":"k_x","label":"X","w":1,"action":{"kind":"KEY","payload":"X"}},
+          {"id":"k_c","label":"C","w":1,"action":{"kind":"KEY","payload":"C"}},
+          {"id":"k_v","label":"V","w":1,"action":{"kind":"KEY","payload":"V"}},
+          {"id":"k_b","label":"B","w":1,"action":{"kind":"KEY","payload":"B"}},
+          {"id":"k_n","label":"N","w":1,"action":{"kind":"KEY","payload":"N"}},
+          {"id":"k_m","label":"M","w":1,"action":{"kind":"KEY","payload":"M"}},
+          {"id":"k_comma","label":",","w":1,"action":{"kind":"KEY","payload":"COMMA"}},
+          {"id":"k_period","label":".","w":1,"action":{"kind":"KEY","payload":"PERIOD"}},
+          {"id":"k_slash","label":"/","w":1,"action":{"kind":"KEY","payload":"SLASH"}},
+          {"id":"k_rshift","label":"Shift","w":2.75,"action":{"kind":"KEY","payload":"RSHIFT"}}
+        ],
+        [
+          {"id":"k_lctrl","label":"Ctrl","w":1.5,"action":{"kind":"KEY","payload":"LCTRL"}},
+          {"id":"k_lwin","label":"Win","w":1.2,"action":{"kind":"KEY","payload":"LWIN"}},
+          {"id":"k_lalt","label":"Alt","w":1.2,"action":{"kind":"KEY","payload":"LALT"}},
+          {"id":"k_space","label":"Space","w":6,"action":{"kind":"KEY","payload":"SPACE"}},
+          {"id":"k_ralt","label":"Alt","w":1.2,"action":{"kind":"KEY","payload":"RALT"}},
+          {"id":"k_menu","label":"Menu","w":1.2,"action":{"kind":"KEY","payload":"MENU"}},
+          {"id":"k_rctrl","label":"Ctrl","w":1.5,"action":{"kind":"KEY","payload":"RCTRL"}}
+        ]
+      ]
+    }
+  ]
+}

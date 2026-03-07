@@ -1,0 +1,20 @@
+﻿[
+    {
+        "Artifact":  "latest-build\\keyboard\\app-release-signed.apk",
+        "SizeBytes":  12030270,
+        "LastWriteTime":  "2026-03-08 00:46:46",
+        "SHA256":  "4168102213B7AE1F2E9297F2623BC50A51B03ECE0F3F200CB14888241387FDD5"
+    },
+    {
+        "Artifact":  "latest-build\\touchpad\\touchpad-debug.apk",
+        "SizeBytes":  12871285,
+        "LastWriteTime":  "2026-03-08 00:22:11",
+        "SHA256":  "BF55E8CF372A8890D92088B2BFFD0089E91F56BC1D2809560B67931355FE85ED"
+    },
+    {
+        "Artifact":  "latest-build\\receiver\\Receiver_WinUI.exe",
+        "SizeBytes":  162577330,
+        "LastWriteTime":  "2026-03-07 23:03:25",
+        "SHA256":  "161412CCB203950E1307052ABB0416AD3F2C4D29B07B3E554B84E87A5B1D62FD"
+    }
+]
