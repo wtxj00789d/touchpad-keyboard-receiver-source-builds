@@ -1,6 +1,7 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Globalization;
 using System.Text.Json;
 using Fleck;
 
@@ -18,7 +19,11 @@ public sealed record ReceiverSnapshot(
     bool ActionsEnabled,
     string Codec,
     string SelectedDevice,
-    bool DriverInstalled);
+    bool DriverInstalled,
+    float SystemVolume,
+    string LastServerError,
+    UsbConnectState UsbState,
+    string UsbMessage);
 
 public sealed class ReceiverService : IDisposable
 {
@@ -56,6 +61,10 @@ public sealed class ReceiverService : IDisposable
     private bool _mute;
     private int? _rttMs = null;
     private bool _driverInstalled;
+    private float _systemVolume;
+    private string _lastServerError = string.Empty;
+    private UsbConnectState _usbState = UsbConnectState.NotReady;
+    private string _usbMessage = "USB connect not started";
     private bool _disposed;
 
     public ReceiverService()
@@ -68,6 +77,7 @@ public sealed class ReceiverService : IDisposable
 
         _actions = new ActionExecutor(message => Log(message));
         _driverInstalled = DriverInstaller.IsVbCableInstalled();
+        _systemVolume = SystemVolumeController.GetVolumeScalar();
 
         _stateTimer = new System.Threading.Timer(_ => PushStateToClients(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
@@ -77,9 +87,36 @@ public sealed class ReceiverService : IDisposable
 
     public bool IsServerRunning => _serverRunning;
 
+    public bool EnsureServerStarted(string host = "0.0.0.0", int port = 8765)
+    {
+        if (_serverRunning)
+        {
+            return true;
+        }
+
+        return StartServer(host, port);
+    }
+
+    public void SetUsbStatus(UsbConnectResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        lock (_sync)
+        {
+            _usbState = result.State;
+            _usbMessage = result.Message;
+        }
+
+        RaiseChanged();
+    }
+
     public void RefreshDriverStatus()
     {
-        _driverInstalled = DriverInstaller.IsVbCableInstalled();
+        lock (_sync)
+        {
+            _driverInstalled = DriverInstaller.IsVbCableInstalled();
+        }
+
         RaiseChanged();
     }
 
@@ -90,14 +127,23 @@ public sealed class ReceiverService : IDisposable
 
     public bool SelectOutputDevice(string? deviceId)
     {
-        var ok = _audio.SelectDevice(deviceId);
+        bool ok;
+        lock (_sync)
+        {
+            ok = _audio.SelectDevice(deviceId);
+        }
+
         RaiseChanged();
         return ok;
     }
 
     public void SelectPreferredOutputDevice()
     {
-        _audio.SelectPreferredDevice();
+        lock (_sync)
+        {
+            _audio.SelectPreferredDevice();
+        }
+
         RaiseChanged();
     }
 
@@ -108,22 +154,53 @@ public sealed class ReceiverService : IDisposable
 
     public void SetMute(bool value)
     {
-        _mute = value;
+        lock (_sync)
+        {
+            _mute = value;
+        }
+
         _audio.SetMuted(value);
         Log($"Mute set to {value}");
         RaiseChanged();
     }
 
+    public bool SetSystemVolume(float value)
+    {
+        var target = Math.Clamp(value, 0.0f, 1.0f);
+        var ok = SystemVolumeController.SetVolumeScalar(target);
+        float currentVolume;
+        lock (_sync)
+        {
+            currentVolume = SystemVolumeController.GetVolumeScalar(_systemVolume);
+            _systemVolume = currentVolume;
+        }
+
+        Log(ok
+            ? $"System volume set to {(int)Math.Round(currentVolume * 100)}%"
+            : "System volume set failed");
+        RaiseChanged();
+        return ok;
+    }
+
     public bool ToggleActions()
     {
-        var enabled = _actions.ToggleEnabled();
+        bool enabled;
+        lock (_sync)
+        {
+            enabled = _actions.ToggleEnabled();
+        }
+
         RaiseChanged();
         return enabled;
     }
 
     public void SetActionsEnabled(bool enabled)
     {
-        _actions.SetEnabled(enabled);
+        lock (_sync)
+        {
+            _actions.SetEnabled(enabled);
+        }
+
         RaiseChanged();
     }
 
@@ -150,6 +227,7 @@ public sealed class ReceiverService : IDisposable
                 });
 
                 _serverRunning = true;
+                _lastServerError = string.Empty;
                 var connectableUrls = ResolveConnectableServerUrls(port);
                 _serverAddress = connectableUrls.Count > 0
                     ? string.Join(" | ", connectableUrls)
@@ -167,6 +245,7 @@ public sealed class ReceiverService : IDisposable
                 _server = null;
                 _serverRunning = false;
                 _serverAddress = "-";
+                _lastServerError = ex.Message;
                 RaiseChanged();
                 return false;
             }
@@ -219,20 +298,10 @@ public sealed class ReceiverService : IDisposable
 
     public ReceiverSnapshot GetSnapshot()
     {
-        var stats = _audio.GetStats();
-        return new ReceiverSnapshot(
-            ServerRunning: _serverRunning,
-            ServerAddress: _serverAddress,
-            Connected: _connected,
-            ClientIp: _clientIp,
-            RttMs: _rttMs,
-            JitterMs: stats.JitterMs,
-            BufferedMs: stats.BufferedMs,
-            Mute: _mute,
-            ActionsEnabled: _actions.Enabled,
-            Codec: stats.CodecName,
-            SelectedDevice: _audio.SelectedDeviceName ?? "System default",
-            DriverInstalled: _driverInstalled);
+        lock (_sync)
+        {
+            return CreateSnapshotLocked();
+        }
     }
 
     public IReadOnlyList<string> GetRecentLogs(int limit = 50)
@@ -451,21 +520,70 @@ public sealed class ReceiverService : IDisposable
             ? opElement.GetString() ?? string.Empty
             : string.Empty;
 
-        if (!op.Equals("set_mute", StringComparison.OrdinalIgnoreCase))
+        if (op.Equals("set_mute", StringComparison.OrdinalIgnoreCase))
+        {
+            var nextMute = root.TryGetProperty("value", out var valueElement) &&
+                           valueElement.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+                           valueElement.GetBoolean();
+
+            SetMute(nextMute);
+            SendJson(socket, new Dictionary<string, object?>
+            {
+                ["type"] = "event",
+                ["level"] = "info",
+                ["message"] = $"mute={nextMute}"
+            });
+            return;
+        }
+
+        ActionResult? windowResult = op.ToLowerInvariant() switch
+        {
+            "window_minimize" => ActionExecutor.MinimizeForegroundWindow(),
+            "window_maximize" => ActionExecutor.MaximizeForegroundWindow(),
+            "window_restore" => ActionExecutor.RestoreForegroundWindow(),
+            "window_close" => ActionExecutor.CloseForegroundWindow(),
+            _ => null
+        };
+
+        if (windowResult != null)
+        {
+            SendJson(socket, new Dictionary<string, object?>
+            {
+                ["type"] = "event",
+                ["level"] = windowResult.Ok ? "info" : "error",
+                ["message"] = windowResult.Message
+            });
+            if (windowResult.Ok)
+            {
+                PushStateToClients();
+            }
+            return;
+        }
+
+        if (!op.Equals("set_volume", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        var nextMute = root.TryGetProperty("value", out var valueElement) &&
-                       valueElement.ValueKind is JsonValueKind.True or JsonValueKind.False &&
-                       valueElement.GetBoolean();
+        if (!TryParseVolumeValue(root, out var volume))
+        {
+            SendJson(socket, new Dictionary<string, object?>
+            {
+                ["type"] = "event",
+                ["level"] = "error",
+                ["message"] = "set_volume requires numeric value"
+            });
+            return;
+        }
 
-        SetMute(nextMute);
+        var ok = SetSystemVolume(volume);
         SendJson(socket, new Dictionary<string, object?>
         {
             ["type"] = "event",
-            ["level"] = "info",
-            ["message"] = $"mute={nextMute}"
+            ["level"] = ok ? "info" : "error",
+            ["message"] = ok
+                ? $"volume={Math.Round(_systemVolume, 3)}"
+                : "volume_set_failed"
         });
     }
 
@@ -476,14 +594,17 @@ public sealed class ReceiverService : IDisposable
 
         lock (_sync)
         {
+            _systemVolume = SystemVolumeController.GetVolumeScalar(_systemVolume);
             sockets = _clients.Keys.ToList();
-            snapshot = GetSnapshot();
+            snapshot = CreateSnapshotLocked();
         }
 
         if (sockets.Count == 0 || !snapshot.Connected)
         {
             return;
         }
+
+        var windowState = ActionExecutor.GetForegroundWindowState();
 
         var payload = new Dictionary<string, object?>
         {
@@ -492,10 +613,16 @@ public sealed class ReceiverService : IDisposable
             ["mute"] = snapshot.Mute,
             ["rtt_ms"] = snapshot.RttMs,
             ["jitter_ms"] = snapshot.JitterMs,
-            ["active_window"] = ActionExecutor.GetActiveWindowTitle(),
+            ["active_window"] = windowState.Title,
             ["audio_codec"] = snapshot.Codec,
             ["actions_enabled"] = snapshot.ActionsEnabled,
-            ["client_count"] = sockets.Count
+            ["client_count"] = sockets.Count,
+            ["window_controls_available"] = windowState.HasControls,
+            ["window_can_minimize"] = windowState.CanMinimize,
+            ["window_can_maximize"] = windowState.CanMaximize,
+            ["window_can_close"] = windowState.CanClose,
+            ["window_maximized"] = windowState.IsMaximized,
+            ["system_volume"] = Math.Round(snapshot.SystemVolume, 3)
         };
 
         foreach (var socket in sockets)
@@ -508,6 +635,28 @@ public sealed class ReceiverService : IDisposable
     {
         _connected = _clients.Count > 0;
         _clientIp = _connected ? BuildClientSummaryLocked() : string.Empty;
+    }
+
+    private ReceiverSnapshot CreateSnapshotLocked()
+    {
+        var stats = _audio.GetStats();
+        return new ReceiverSnapshot(
+            ServerRunning: _serverRunning,
+            ServerAddress: _serverAddress,
+            Connected: _connected,
+            ClientIp: _clientIp,
+            RttMs: _rttMs,
+            JitterMs: stats.JitterMs,
+            BufferedMs: stats.BufferedMs,
+            Mute: _mute,
+            ActionsEnabled: _actions.Enabled,
+            Codec: stats.CodecName,
+            SelectedDevice: _audio.SelectedDeviceName ?? "System default",
+            DriverInstalled: _driverInstalled,
+            SystemVolume: _systemVolume,
+            LastServerError: _lastServerError,
+            UsbState: _usbState,
+            UsbMessage: _usbMessage);
     }
 
     private string BuildClientSummaryLocked()
@@ -659,6 +808,46 @@ public sealed class ReceiverService : IDisposable
         };
 
         return blockedKeywords.Any(text.Contains);
+    }
+
+    private static bool TryParseVolumeValue(JsonElement root, out float value)
+    {
+        value = 0.0f;
+        if (!root.TryGetProperty("value", out var valueElement))
+        {
+            return false;
+        }
+
+        double parsed;
+        switch (valueElement.ValueKind)
+        {
+            case JsonValueKind.Number:
+                if (!valueElement.TryGetDouble(out parsed))
+                {
+                    return false;
+                }
+                break;
+            case JsonValueKind.String:
+            {
+                var raw = valueElement.GetString();
+                if (string.IsNullOrWhiteSpace(raw) ||
+                    !double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed))
+                {
+                    return false;
+                }
+                break;
+            }
+            default:
+                return false;
+        }
+
+        if (parsed > 1.0 && parsed <= 100.0)
+        {
+            parsed /= 100.0;
+        }
+
+        value = (float)Math.Clamp(parsed, 0.0, 1.0);
+        return true;
     }
 
     public void Dispose()

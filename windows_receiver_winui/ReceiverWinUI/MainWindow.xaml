@@ -1,204 +1,321 @@
-﻿<Window x:Class="ReceiverWinUI.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FluxMic Receiver WinUI"
-        Height="760"
-        Width="1180"
-        MinHeight="620"
-        MinWidth="980"
-        Background="#0B1320"
-        WindowStartupLocation="CenterScreen">
-    <Window.Resources>
-        <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#E5EDF8" />
-        </Style>
-        <Style TargetType="Button">
-            <Setter Property="Foreground" Value="#EAF2FF" />
-            <Setter Property="Background" Value="#1C3554" />
-            <Setter Property="BorderBrush" Value="#3A6EA8" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="14,8" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-        </Style>
-        <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="#13233A" />
-            <Setter Property="BorderBrush" Value="#2A4970" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
-            <Setter Property="Padding" Value="14" />
-            <Setter Property="Margin" Value="0,0,0,12" />
-        </Style>
-        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Foreground" Value="#EAF2FF" />
-            <Setter Property="Background" Value="#11243B" />
-            <Setter Property="Padding" Value="6,4" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Style.Triggers>
-                <Trigger Property="IsHighlighted" Value="True">
-                    <Setter Property="Background" Value="#1C3C62" />
-                    <Setter Property="Foreground" Value="#FFFFFF" />
-                </Trigger>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#2A6FB0" />
-                    <Setter Property="Foreground" Value="#FFFFFF" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <Style TargetType="ComboBox">
-            <Setter Property="Foreground" Value="#EAF2FF" />
-            <Setter Property="Background" Value="#11243B" />
-            <Setter Property="BorderBrush" Value="#3A6EA8" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItemStyle}" />
-        </Style>
-        <Style TargetType="ListBox">
-            <Setter Property="Foreground" Value="#DCE9F9" />
-            <Setter Property="Background" Value="#0E1D31" />
-            <Setter Property="BorderBrush" Value="#31567E" />
-        </Style>
-    </Window.Resources>
+<Window
+    x:Class="ReceiverWinUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid x:Name="RootGrid" Loaded="RootGrid_Loaded" Background="#313131">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-    <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+        <Border Grid.Column="0" Background="#313131" BorderThickness="0,0,1,0" BorderBrush="#22000000" Padding="16,18,12,18">
+            <StackPanel>
+                <TextBlock Text="FluxMic Receiver" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="Settings" Opacity="0.72" Margin="0,4,0,0" />
 
-        <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,0,12">
-            <Grid>
+                <ListBox
+                    x:Name="NavList"
+                    Margin="0,18,0,0"
+                    SelectionMode="Single"
+                    BorderThickness="0"
+                    SelectionChanged="NavList_SelectionChanged">
+                    <ListBoxItem Tag="overview" Padding="10,8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <SymbolIcon Symbol="Home" />
+                            <TextBlock Text="Overview" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="audio" Padding="10,8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <SymbolIcon Symbol="Audio" />
+                            <TextBlock Text="Audio &amp; Driver" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="controls" Padding="10,8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <SymbolIcon Symbol="Switch" />
+                            <TextBlock Text="Controls" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="activity" Padding="10,8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <SymbolIcon Symbol="Library" />
+                            <TextBlock Text="Activity" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
+                </ListBox>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Background="#313131" Padding="24,18,24,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel>
-                    <TextBlock Text="FluxMic Receiver (WinUI/WPF)" FontSize="24" FontWeight="SemiBold" />
-                    <TextBlock Text="WebSocket + Audio Inject + Action Execution" Opacity="0.82" />
-                </StackPanel>
+                <AutoSuggestBox
+                    x:Name="SearchBox"
+                    PlaceholderText="Search settings"
+                    QuerySubmitted="SearchBox_QuerySubmitted"
+                    MaxWidth="420"
+                    HorizontalAlignment="Left" />
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="MinimizeTrayButton" Content="Minimize To Tray" Click="MinimizeTrayButton_Click" />
-                </StackPanel>
+                <Button
+                    x:Name="MinimizeTrayButton"
+                    Grid.Column="1"
+                    Content="Minimize"
+                    Padding="14,8"
+                    Click="MinimizeTrayButton_Click" />
             </Grid>
-        </Border>
 
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" />
-                <ColumnDefinition Width="3*" />
-            </Grid.ColumnDefinitions>
+            <Grid Grid.Row="1" Background="#313131">
+                <Grid x:Name="OverviewPage" Background="#313131">
+                    <ScrollViewer>
+                        <StackPanel>
+                            <TextBlock Text="Overview" FontSize="28" FontWeight="SemiBold" />
+                            <TextBlock Text="Connection quality, server status, and runtime summary." Opacity="0.72" Margin="0,4,0,0" />
 
-            <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                <Border Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Connection" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="130" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+                            <Border BorderThickness="1" BorderBrush="#22000000" CornerRadius="12" Padding="16" Margin="0,14,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                            <TextBlock Text="Server" Grid.Row="0" Grid.Column="0" />
-                            <TextBlock x:Name="ServerStatusValue" Grid.Row="0" Grid.Column="1" FontWeight="SemiBold" />
+                                    <TextBlock Text="Server" Grid.Row="0" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="ServerStatusValue" Grid.Row="0" Grid.Column="1" FontWeight="SemiBold" />
 
-                            <TextBlock Text="Server URL" Grid.Row="1" Grid.Column="0" />
-                            <TextBlock x:Name="ServerAddressValue" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" />
+                                    <TextBlock Text="Server URL" Grid.Row="1" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="ServerAddressValue" Grid.Row="1" Grid.Column="1" FontWeight="SemiBold" TextWrapping="Wrap" />
 
-                            <TextBlock Text="Clients" Grid.Row="2" Grid.Column="0" />
-                            <TextBlock x:Name="ClientIpValue" Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" />
+                                    <TextBlock Text="Clients" Grid.Row="2" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="ClientIpValue" Grid.Row="2" Grid.Column="1" FontWeight="SemiBold" TextWrapping="Wrap" />
 
-                            <TextBlock Text="RTT" Grid.Row="3" Grid.Column="0" />
-                            <TextBlock x:Name="RttValue" Grid.Row="3" Grid.Column="1" />
+                                    <TextBlock Text="RTT" Grid.Row="3" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="RttValue" Grid.Row="3" Grid.Column="1" FontWeight="SemiBold" />
 
-                            <TextBlock Text="Jitter" Grid.Row="4" Grid.Column="0" />
-                            <TextBlock x:Name="JitterValue" Grid.Row="4" Grid.Column="1" />
+                                    <TextBlock Text="Jitter" Grid.Row="4" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="JitterValue" Grid.Row="4" Grid.Column="1" FontWeight="SemiBold" />
 
-                            <TextBlock Text="Buffered" Grid.Row="5" Grid.Column="0" />
-                            <TextBlock x:Name="BufferedValue" Grid.Row="5" Grid.Column="1" />
+                                    <TextBlock Text="Buffered" Grid.Row="5" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="BufferedValue" Grid.Row="5" Grid.Column="1" FontWeight="SemiBold" />
 
-                            <TextBlock Text="Mute" Grid.Row="6" Grid.Column="0" />
-                            <TextBlock x:Name="MuteValue" Grid.Row="6" Grid.Column="1" />
+                                    <TextBlock Text="Mute" Grid.Row="6" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="MuteValue" Grid.Row="6" Grid.Column="1" FontWeight="SemiBold" />
 
-                            <TextBlock Text="Actions" Grid.Row="7" Grid.Column="0" />
-                            <TextBlock x:Name="ActionsValue" Grid.Row="7" Grid.Column="1" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
+                                    <TextBlock Text="Actions" Grid.Row="7" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="ActionsValue" Grid.Row="7" Grid.Column="1" FontWeight="SemiBold" />
 
-                <Border Style="{StaticResource Card}">
-                    <StackPanel>
-                        <TextBlock Text="Audio Device / Driver" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="130" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+                                    <TextBlock Text="Server Error" Grid.Row="8" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="ServerErrorValue" Grid.Row="8" Grid.Column="1" FontWeight="SemiBold" TextWrapping="Wrap" />
 
-                            <TextBlock Text="Driver" Grid.Row="0" Grid.Column="0" />
-                            <TextBlock x:Name="DriverValue" Grid.Row="0" Grid.Column="1" FontWeight="SemiBold" />
+                                    <TextBlock Text="USB Status" Grid.Row="9" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="UsbStatusValue" Grid.Row="9" Grid.Column="1" FontWeight="SemiBold" />
 
-                            <TextBlock Text="Codec" Grid.Row="1" Grid.Column="0" />
-                            <TextBlock x:Name="CodecValue" Grid.Row="1" Grid.Column="1" />
+                                    <TextBlock Text="USB Message" Grid.Row="10" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="UsbMessageValue" Grid.Row="10" Grid.Column="1" FontWeight="SemiBold" TextWrapping="Wrap" />
 
-                            <TextBlock Text="Current Out" Grid.Row="2" Grid.Column="0" />
-                            <TextBlock x:Name="CurrentOutputValue" Grid.Row="2" Grid.Column="1" TextTrimming="CharacterEllipsis" />
-                        </Grid>
+                                    <TextBlock Text="USB Action" Grid.Row="11" Grid.Column="0" Opacity="0.72" />
+                                    <StackPanel Grid.Row="11" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <Button
+                                            x:Name="UsbConnectButton"
+                                            Content="USB Connect"
+                                            Padding="14,8"
+                                            Click="UsbConnectButton_Click" />
+                                        <Button
+                                            x:Name="UsbRetryButton"
+                                            Content="Retry"
+                                            Padding="14,8"
+                                            Click="UsbRetryButton_Click" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <Button x:Name="InstallDriverButton" Content="Install Driver" Click="InstallDriverButton_Click" />
-                            <Button x:Name="RefreshDevicesButton" Content="Refresh Devices" Click="RefreshDevicesButton_Click" />
+                            <Border BorderThickness="1" BorderBrush="#22000000" CornerRadius="12" Padding="16" Margin="0,12,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Driver" Grid.Row="0" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="DriverValue" Grid.Row="0" Grid.Column="1" FontWeight="SemiBold" />
+
+                                    <TextBlock Text="Codec" Grid.Row="1" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="CodecValue" Grid.Row="1" Grid.Column="1" FontWeight="SemiBold" />
+
+                                    <TextBlock Text="Current Out" Grid.Row="2" Grid.Column="0" Opacity="0.72" />
+                                    <TextBlock x:Name="CurrentOutputValue" Grid.Row="2" Grid.Column="1" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                </Grid>
+                            </Border>
                         </StackPanel>
+                    </ScrollViewer>
+                </Grid>
 
-                        <StackPanel Orientation="Horizontal">
-                            <ComboBox x:Name="OutputDeviceCombo" Width="360" Margin="0,0,8,0" DisplayMemberPath="Name">
-                                <ComboBox.Resources>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#11243B" />
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#11243B" />
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#EAF2FF" />
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#2A6FB0" />
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF" />
-                                </ComboBox.Resources>
-                            </ComboBox>
-                            <Button x:Name="ApplyOutputButton" Content="Apply Device" Click="ApplyOutputButton_Click" />
+                <Grid x:Name="AudioPage" Background="#313131" Visibility="Collapsed">
+                    <ScrollViewer>
+                        <StackPanel>
+                            <TextBlock Text="Audio &amp; Driver" FontSize="28" FontWeight="SemiBold" />
+                            <TextBlock Text="Manage output device selection and VB-CABLE installation." Opacity="0.72" Margin="0,4,0,0" />
+
+                            <Border BorderThickness="1" BorderBrush="#22000000" CornerRadius="12" Padding="16" Margin="0,14,0,0">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <ComboBox
+                                            x:Name="OutputDeviceCombo"
+                                            Grid.Column="0"
+                                            DisplayMemberPath="Name"
+                                            Margin="0,0,8,0" />
+                                        <Button
+                                            x:Name="ApplyOutputButton"
+                                            Grid.Column="1"
+                                            Content="Apply"
+                                            Padding="14,8"
+                                            Click="ApplyOutputButton_Click" />
+                                    </Grid>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                        <Button
+                                            x:Name="InstallDriverButton"
+                                            Content="Install Driver"
+                                            Padding="14,8"
+                                            Margin="0,0,8,0"
+                                            Click="InstallDriverButton_Click" />
+                                        <Button
+                                            x:Name="RefreshDevicesButton"
+                                            Content="Refresh Devices"
+                                            Padding="14,8"
+                                            Click="RefreshDevicesButton_Click" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </StackPanel>
-                </Border>
+                    </ScrollViewer>
+                </Grid>
 
-                <Border Style="{StaticResource Card}" Margin="0,0,0,0">
-                    <StackPanel Orientation="Horizontal">
-                        <Button x:Name="StartStopButton" Content="Start Server" Click="StartStopButton_Click" />
-                        <Button x:Name="ToggleActionsButton" Content="Disable Actions" Click="ToggleActionsButton_Click" />
-                        <Button x:Name="ToggleMuteButton" Content="Toggle Mute" Click="ToggleMuteButton_Click" />
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+                <Grid x:Name="ControlsPage" Background="#313131" Visibility="Collapsed">
+                    <ScrollViewer>
+                        <StackPanel>
+                            <TextBlock Text="Controls" FontSize="28" FontWeight="SemiBold" />
+                            <TextBlock Text="Runtime operations for server state, action execution, and mute." Opacity="0.72" Margin="0,4,0,0" />
 
-            <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,0,0">
-                <Grid>
+                            <Border BorderThickness="1" BorderBrush="#22000000" CornerRadius="12" Padding="16" Margin="0,14,0,0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button
+                                            x:Name="StartStopButton"
+                                            Content="Start Server"
+                                            Padding="14,8"
+                                            Margin="0,0,8,0"
+                                            Click="StartStopButton_Click" />
+                                        <Button
+                                            x:Name="ToggleActionsButton"
+                                            Content="Disable Actions"
+                                            Padding="14,8"
+                                            Margin="0,0,8,0"
+                                            Click="ToggleActionsButton_Click" />
+                                        <Button
+                                            x:Name="ToggleMuteButton"
+                                            Content="Toggle Mute"
+                                            Padding="14,8"
+                                            Click="ToggleMuteButton_Click" />
+                                    </StackPanel>
+
+                                    <Grid Margin="0,14,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="130" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="52" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock
+                                            Grid.Column="0"
+                                            Text="System Volume"
+                                            VerticalAlignment="Center"
+                                            Opacity="0.72" />
+
+                                        <Slider
+                                            x:Name="SystemVolumeSlider"
+                                            Grid.Column="1"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            SmallChange="1"
+                                            LargeChange="5"
+                                            ValueChanged="SystemVolumeSlider_ValueChanged" />
+
+                                        <TextBlock
+                                            x:Name="SystemVolumeValueText"
+                                            Grid.Column="2"
+                                            Text="0%"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Right"
+                                            FontWeight="SemiBold" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+
+                <Grid x:Name="ActivityPage" Background="#313131" Visibility="Collapsed">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Recent Actions / Events" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
-                    <ListBox Grid.Row="1" x:Name="LogsList" />
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="Activity" FontSize="28" FontWeight="SemiBold" />
+                        <TextBlock Text="Live event stream for websocket, audio, and actions." Opacity="0.72" Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <Border Grid.Row="1" BorderThickness="1" BorderBrush="#22000000" CornerRadius="12" Padding="16" Margin="0,12,0,0">
+                        <ListView
+                            x:Name="LogsList"
+                            SelectionMode="None"
+                            IsItemClickEnabled="False">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock
+                                        Text="{Binding}"
+                                        FontSize="12"
+                                        TextWrapping="Wrap"
+                                        Margin="0,2,0,2" />
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
                 </Grid>
-            </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

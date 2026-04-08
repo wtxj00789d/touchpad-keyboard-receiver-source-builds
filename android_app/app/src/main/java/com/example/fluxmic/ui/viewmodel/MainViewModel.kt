@@ -8,12 +8,19 @@ import androidx.lifecycle.viewModelScope
 import com.example.fluxmic.audio.AudioStreamer
 import com.example.fluxmic.model.ActionMessage
 import com.example.fluxmic.model.ControlMessage
+import com.example.fluxmic.model.ExternalConnectCommand
 import com.example.fluxmic.model.KeyConfig
+import com.example.fluxmic.model.KeyboardBehavior
+import com.example.fluxmic.model.KeyboardLayerState
+import com.example.fluxmic.model.KeyboardLayoutMode
 import com.example.fluxmic.model.LayoutConfig
 import com.example.fluxmic.model.LayoutRepository
 import com.example.fluxmic.model.PingMessage
+import com.example.fluxmic.model.ServerAddressEditor
+import com.example.fluxmic.model.ServerAddressFormatter
 import com.example.fluxmic.model.StateMessage
 import com.example.fluxmic.model.UiState
+import com.example.fluxmic.model.WindowControlState
 import com.example.fluxmic.net.PanelWebSocketClient
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,6 +42,7 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
     companion object {
         private const val PREFS_NAME = "fluxmic_prefs"
         private const val PREF_SERVER_WS_URL = "server_ws_url"
+        private const val PREF_KEYBOARD_LAYOUT_MODE = "keyboard_layout_mode"
     }
 
     private val json = Json {
@@ -55,8 +63,7 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
     private var currentLayout: LayoutConfig? = null
     private var pingJob: Job? = null
     private var micPermissionGranted = false
-    private val activePressedKeys = LinkedHashSet<String>()
-    private var localCapsLockOn = false
+    private var keyboardLayerState = KeyboardLayerState()
 
     private val audioStreamer = AudioStreamer(
         onAudioFrame = { frame ->
@@ -75,10 +82,18 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
     init {
         wsClient.setListener(this)
         val savedUrl = prefs.getString(PREF_SERVER_WS_URL, null)
-        if (!savedUrl.isNullOrBlank()) {
-            _uiState.value = _uiState.value.copy(serverUrl = savedUrl)
-        }
-        loadDefaultLayout()
+        val savedLayoutMode = KeyboardLayoutMode.fromStoredValue(
+            prefs.getString(PREF_KEYBOARD_LAYOUT_MODE, null)
+        )
+        val normalizedUrl = ServerAddressFormatter
+            .normalizeForConnection(savedUrl ?: _uiState.value.serverUrl)
+            .ifBlank { _uiState.value.serverUrl }
+        _uiState.value = _uiState.value.copy(
+            keyboardLayoutMode = savedLayoutMode,
+            serverUrl = normalizedUrl,
+            serverAddressDraft = ServerAddressFormatter.toDisplayValue(normalizedUrl)
+        )
+        loadDefaultLayout(savedLayoutMode)
     }
 
     fun setMicPermission(granted: Boolean) {
@@ -92,14 +107,70 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
     }
 
     fun setServerUrl(url: String) {
-        _uiState.value = _uiState.value.copy(serverUrl = url)
-        prefs.edit().putString(PREF_SERVER_WS_URL, url).apply()
+        val normalizedUrl = ServerAddressFormatter.normalizeForConnection(url)
+        if (normalizedUrl.isBlank()) return
+        _uiState.value = _uiState.value.copy(
+            serverUrl = normalizedUrl,
+            serverAddressDraft = ServerAddressFormatter.toDisplayValue(normalizedUrl)
+        )
+        prefs.edit().putString(PREF_SERVER_WS_URL, normalizedUrl).apply()
+    }
+
+    fun handleExternalConnectCommand(command: ExternalConnectCommand) {
+        val normalizedUrl = ServerAddressFormatter.normalizeForConnection(command.targetUrl)
+        if (normalizedUrl.isBlank()) return
+        val displayUrl = ServerAddressFormatter.toDisplayValue(normalizedUrl)
+        _uiState.value = _uiState.value.copy(
+            serverUrl = normalizedUrl,
+            serverAddressDraft = displayUrl,
+            addressEditorExpanded = false
+        )
+        prefs.edit().putString(PREF_SERVER_WS_URL, normalizedUrl).apply()
+
+        if (_uiState.value.connected || _uiState.value.connecting) {
+            disconnect()
+        }
+
+        if (command.autoConnect) {
+            connect()
+        }
+    }
+
+    fun toggleAddressEditor() {
+        val nextExpanded = !_uiState.value.addressEditorExpanded
+        val displayValue = ServerAddressFormatter.toDisplayValue(_uiState.value.serverUrl)
+        _uiState.value = _uiState.value.copy(
+            addressEditorExpanded = nextExpanded,
+            serverAddressDraft = if (nextExpanded) {
+                if (_uiState.value.serverAddressDraft.isBlank()) displayValue else _uiState.value.serverAddressDraft
+            } else {
+                displayValue
+            }
+        )
+    }
+
+    fun setKeyboardLayoutMode(layoutMode: KeyboardLayoutMode) {
+        if (layoutMode == _uiState.value.keyboardLayoutMode && currentLayout != null) return
+        prefs.edit().putString(PREF_KEYBOARD_LAYOUT_MODE, layoutMode.storedValue).apply()
+        loadDefaultLayout(layoutMode)
     }
 
     fun connect() {
-        val url = _uiState.value.serverUrl.trim()
+        val draftSource = if (_uiState.value.addressEditorExpanded) {
+            _uiState.value.serverAddressDraft
+        } else {
+            _uiState.value.serverUrl
+        }
+        val url = ServerAddressFormatter.normalizeForConnection(draftSource)
         if (url.isEmpty()) return
-        _uiState.value = _uiState.value.copy(connecting = true, statusText = "Connecting...")
+        _uiState.value = _uiState.value.copy(
+            serverUrl = url,
+            serverAddressDraft = ServerAddressFormatter.toDisplayValue(url),
+            addressEditorExpanded = false,
+            connecting = true,
+            statusText = "Connecting..."
+        )
+        prefs.edit().putString(PREF_SERVER_WS_URL, url).apply()
         wsClient.connect(url)
     }
 
@@ -108,13 +179,18 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
         pingJob?.cancel()
         pingJob = null
         audioStreamer.stop()
-        activePressedKeys.clear()
-        localCapsLockOn = false
+        keyboardLayerState = KeyboardLayerState()
         _uiState.value = _uiState.value.copy(
             connected = false,
             connecting = false,
             statusText = "Disconnected",
-            stateFlags = _uiState.value.stateFlags.toMutableMap().apply { this["caps_lock"] = false }
+            activeWindow = "",
+            windowControls = WindowControlState(),
+            keyboardLayerState = keyboardLayerState,
+            stateFlags = _uiState.value.stateFlags.toMutableMap().apply {
+                this["caps_lock"] = false
+                this["fn_lock"] = false
+            }
         )
     }
 
@@ -124,18 +200,46 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
         sendControl(op = "set_mute", value = JsonPrimitive(next))
     }
 
+    fun setRemoteVolume(volume: Float) {
+        val clamped = volume.coerceIn(0f, 1f)
+        _uiState.value = _uiState.value.copy(systemVolume = clamped)
+        sendControl(op = "set_volume", value = JsonPrimitive(clamped))
+    }
+
+    fun minimizeActiveWindow() {
+        val windowControls = _uiState.value.windowControls
+        if (!windowControls.available || !windowControls.canMinimize) return
+        sendControl(op = "window_minimize", value = null)
+    }
+
+    fun toggleMaximizeActiveWindow() {
+        val windowControls = _uiState.value.windowControls
+        if (!windowControls.available || !windowControls.canMaximize) return
+        sendControl(op = windowControls.maximizeControlOp(), value = null)
+    }
+
+    fun closeActiveWindow() {
+        val windowControls = _uiState.value.windowControls
+        if (!windowControls.available || !windowControls.canClose) return
+        sendControl(op = "window_close", value = null)
+    }
+
     fun selectPage(index: Int) {
         if (index !in _uiState.value.pages.indices) return
         _uiState.value = _uiState.value.copy(selectedPageIndex = index)
     }
 
     fun switchLayoutByName(name: String): Boolean {
-        val loaded = layoutRepo.loadByLayoutName(name)
+        val loaded = if (name.equals("default", ignoreCase = true)) {
+            layoutRepo.loadDefault(_uiState.value.keyboardLayoutMode)
+        } else {
+            layoutRepo.loadByLayoutName(name)
+        }
         if (loaded == null) {
             _uiState.value = _uiState.value.copy(lastEvent = "Layout not found: $name")
             return false
         }
-        applyLayout(loaded)
+        applyLayout(loaded, _uiState.value.keyboardLayoutMode)
         return true
     }
 
@@ -179,25 +283,36 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
 
         val token = jsonElementToString(spec.payload).trim().uppercase()
         if (token.isBlank()) return
-        if (activePressedKeys.contains(token)) return
-        if (activePressedKeys.size >= 3) return
-
-        activePressedKeys.add(token)
-        if (token == "CAPSLOCK") {
-            localCapsLockOn = !localCapsLockOn
-            _uiState.value = _uiState.value.copy(
-                stateFlags = _uiState.value.stateFlags.toMutableMap().apply {
-                    this["caps_lock"] = localCapsLockOn
-                }
-            )
-        }
-        if (isModifierKey(token) && activePressedKeys.none { !isModifierKey(it) }) {
+        if (KeyboardBehavior.isFnToken(token)) {
+            updateKeyboardLayerState(KeyboardBehavior.toggleFn(keyboardLayerState))
             return
         }
 
-        val modifiers = activePressedKeys.filter { isModifierKey(it) }
-        val normal = activePressedKeys.filter { !isModifierKey(it) }
-        val combo = (modifiers + normal).joinToString("+")
+        val downResult = KeyboardBehavior.onKeyDown(keyboardLayerState, key.id, token)
+        if (!downResult.accepted) return
+
+        val nextLayerState = if (isCapsLockToken(token)) {
+            KeyboardBehavior.toggleCaps(downResult.state)
+        } else {
+            downResult.state
+        }
+        updateKeyboardLayerState(nextLayerState)
+
+        if (_uiState.value.addressEditorExpanded) {
+            applyAddressEditorToken(
+                token = KeyboardBehavior.resolveOutputToken(token, key.id, nextLayerState),
+                layerState = nextLayerState
+            )
+            return
+        }
+
+        if (isModifierKey(token) && nextLayerState.activeKeyTokens.none(::isNonModifierToken)) {
+            return
+        }
+
+        val modifiers = nextLayerState.activeKeyTokens.filter { isModifierKey(it) }
+        val outputToken = KeyboardBehavior.resolveOutputToken(token, key.id, nextLayerState)
+        val combo = (modifiers + outputToken).joinToString("+")
         sendAction(
             actionId = key.id,
             kind = "KEY",
@@ -210,11 +325,20 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
         if (spec.kind.name != "KEY") return
 
         val token = jsonElementToString(spec.payload).trim().uppercase()
-        if (token.isBlank() || isModifierKey(token) || token == "CAPSLOCK") return
-        if (!activePressedKeys.contains(token)) return
+        if (token.isBlank() || KeyboardBehavior.isFnToken(token) || isModifierKey(token) || isCapsLockToken(token)) return
+        if (!keyboardLayerState.activeKeyTokens.contains(token)) return
 
-        val modifiers = activePressedKeys.filter { isModifierKey(it) }
-        val combo = (modifiers + token).joinToString("+")
+        if (_uiState.value.addressEditorExpanded) {
+            applyAddressEditorToken(
+                token = KeyboardBehavior.resolveOutputToken(token, key.id, keyboardLayerState),
+                layerState = keyboardLayerState
+            )
+            return
+        }
+
+        val modifiers = keyboardLayerState.activeKeyTokens.filter { isModifierKey(it) }
+        val outputToken = KeyboardBehavior.resolveOutputToken(token, key.id, keyboardLayerState)
+        val combo = (modifiers + outputToken).joinToString("+")
         sendAction(
             actionId = key.id,
             kind = "KEY",
@@ -225,7 +349,8 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
     fun onKeyReleased(key: KeyConfig) {
         val token = jsonElementToString(key.action.payload).trim().uppercase()
         if (token.isBlank()) return
-        activePressedKeys.remove(token)
+        if (KeyboardBehavior.isFnToken(token)) return
+        updateKeyboardLayerState(KeyboardBehavior.onKeyUp(keyboardLayerState, key.id, token))
     }
 
     override fun onConnected() {
@@ -253,11 +378,18 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
         pingJob?.cancel()
         pingJob = null
         audioStreamer.stop()
-        activePressedKeys.clear()
+        keyboardLayerState = KeyboardLayerState()
         _uiState.value = _uiState.value.copy(
             connected = false,
             connecting = false,
             statusText = "Disconnected",
+            activeWindow = "",
+            windowControls = WindowControlState(),
+            keyboardLayerState = keyboardLayerState,
+            stateFlags = _uiState.value.stateFlags.toMutableMap().apply {
+                this["caps_lock"] = false
+                this["fn_lock"] = false
+            },
             lastEvent = reason
         )
     }
@@ -278,18 +410,33 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
             if (boolValue != null) flags[k] = boolValue
         }
 
+        val volumeFromState = parseFloatFromJson(state.extra?.get("system_volume"))
+            ?: parseFloatFromJson(state.extra?.get("volume"))
+
         val capsFromServer = flags["caps_lock"] ?: flags["caps"]
         if (capsFromServer != null) {
-            localCapsLockOn = capsFromServer
+            keyboardLayerState = keyboardLayerState.copy(capsLocked = capsFromServer)
         }
-        flags["caps_lock"] = localCapsLockOn
+        flags["caps_lock"] = keyboardLayerState.capsLocked
+        flags["fn_lock"] = keyboardLayerState.fnLocked
+
+        val windowControls = WindowControlState(
+            available = flags["window_controls_available"] ?: false,
+            canMinimize = flags["window_can_minimize"] ?: false,
+            canMaximize = flags["window_can_maximize"] ?: false,
+            canClose = flags["window_can_close"] ?: false,
+            isMaximized = flags["window_maximized"] ?: false
+        )
 
         _uiState.value = _uiState.value.copy(
             connected = state.connected || _uiState.value.connected,
             mute = state.mute,
             rttMs = state.rtt_ms ?: _uiState.value.rttMs,
             jitterMs = state.jitter_ms ?: _uiState.value.jitterMs,
+            systemVolume = volumeFromState ?: _uiState.value.systemVolume,
             activeWindow = state.active_window ?: "",
+            windowControls = windowControls,
+            keyboardLayerState = keyboardLayerState,
             stateFlags = flags
         )
     }
@@ -309,18 +456,22 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
         wsClient.setListener(null)
     }
 
-    private fun loadDefaultLayout() {
+    private fun loadDefaultLayout(layoutMode: KeyboardLayoutMode = _uiState.value.keyboardLayoutMode) {
         runCatching {
-            applyLayout(layoutRepo.loadDefault())
+            applyLayout(layoutRepo.loadDefault(layoutMode), layoutMode)
         }.onFailure {
             _uiState.value = _uiState.value.copy(lastEvent = "Layout load failed: ${it.message}")
         }
     }
 
-    private fun applyLayout(layout: LayoutConfig) {
+    private fun applyLayout(
+        layout: LayoutConfig,
+        layoutMode: KeyboardLayoutMode = _uiState.value.keyboardLayoutMode
+    ) {
         currentLayout = layout
         _uiState.value = _uiState.value.copy(
             layoutName = layout.name,
+            keyboardLayoutMode = layoutMode,
             pages = layout.pages,
             selectedPageIndex = 0,
             lastEvent = "Layout: ${layout.name}"
@@ -353,6 +504,28 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
         _uiState.value = _uiState.value.copy(mute = value)
     }
 
+    private fun updateKeyboardLayerState(nextState: KeyboardLayerState) {
+        keyboardLayerState = nextState
+        _uiState.value = _uiState.value.copy(
+            keyboardLayerState = nextState,
+            stateFlags = _uiState.value.stateFlags.toMutableMap().apply {
+                this["caps_lock"] = nextState.capsLocked
+                this["fn_lock"] = nextState.fnLocked
+            }
+        )
+    }
+
+    private fun applyAddressEditorToken(token: String, layerState: KeyboardLayerState) {
+        if (isModifierKey(token) || isCapsLockToken(token)) return
+        val nextDraft = ServerAddressEditor.applyToken(
+            current = _uiState.value.serverAddressDraft,
+            token = token,
+            layerState = layerState
+        )
+        if (nextDraft == _uiState.value.serverAddressDraft) return
+        _uiState.value = _uiState.value.copy(serverAddressDraft = nextDraft)
+    }
+
     private fun jsonElementToString(payload: JsonElement?): String {
         return when {
             payload == null -> ""
@@ -363,6 +536,19 @@ class MainViewModel(private val appContext: Context) : ViewModel(), PanelWebSock
 
     private fun isModifierKey(token: String): Boolean {
         return token in setOf("CTRL", "SHIFT", "ALT", "WIN", "LCTRL", "RCTRL", "LSHIFT", "RSHIFT", "LALT", "RALT", "LWIN", "RWIN")
+    }
+
+    private fun isCapsLockToken(token: String): Boolean {
+        return token == "CAPSLOCK"
+    }
+
+    private fun isNonModifierToken(token: String): Boolean {
+        return !isModifierKey(token) && !isCapsLockToken(token)
+    }
+
+    private fun parseFloatFromJson(value: JsonElement?): Float? {
+        val raw = runCatching { value?.jsonPrimitive?.contentOrNull }.getOrNull() ?: return null
+        return raw.toFloatOrNull()?.coerceIn(0f, 1f)
     }
 
     class Factory(private val context: Context) : ViewModelProvider.Factory {

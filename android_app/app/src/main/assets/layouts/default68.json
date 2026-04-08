@@ -1,9 +1,9 @@
-﻿{
-  "name": "Default",
+{
+  "name": "Default 68",
   "pages": [
     {
-      "id": "keyboard60",
-      "title": "Keyboard 60%",
+      "id": "keyboard68",
+      "title": "Keyboard 68-Key",
       "key_rows": [
         [
           {"id":"k_esc","label":"Esc","w":1,"action":{"kind":"KEY","payload":"ESC"}},
@@ -65,16 +65,20 @@
           {"id":"k_comma","label":",","w":1,"action":{"kind":"KEY","payload":"COMMA"}},
           {"id":"k_period","label":".","w":1,"action":{"kind":"KEY","payload":"PERIOD"}},
           {"id":"k_slash","label":"/","w":1,"action":{"kind":"KEY","payload":"SLASH"}},
-          {"id":"k_rshift","label":"Shift","w":2.75,"action":{"kind":"KEY","payload":"RSHIFT"}}
+          {"id":"k_rshift","label":"Shift","w":1.75,"action":{"kind":"KEY","payload":"RSHIFT"}},
+          {"id":"k_up","label":"↑","w":1,"action":{"kind":"KEY","payload":"UP"}}
         ],
         [
-          {"id":"k_lctrl","label":"Ctrl","w":1.5,"action":{"kind":"KEY","payload":"LCTRL"}},
-          {"id":"k_lwin","label":"Win","w":1.2,"action":{"kind":"KEY","payload":"LWIN"}},
-          {"id":"k_lalt","label":"Alt","w":1.2,"action":{"kind":"KEY","payload":"LALT"}},
-          {"id":"k_space","label":"Space","w":6,"action":{"kind":"KEY","payload":"SPACE"}},
-          {"id":"k_ralt","label":"Alt","w":1.2,"action":{"kind":"KEY","payload":"RALT"}},
-          {"id":"k_fn","label":"Fn","w":1.2,"state_key":"fn_lock","action":{"kind":"KEY","payload":"FN"}},
-          {"id":"k_rctrl","label":"Ctrl","w":1.5,"action":{"kind":"KEY","payload":"RCTRL"}}
+          {"id":"k_lctrl","label":"Ctrl","w":1.25,"action":{"kind":"KEY","payload":"LCTRL"}},
+          {"id":"k_lwin","label":"Win","w":1.25,"action":{"kind":"KEY","payload":"LWIN"}},
+          {"id":"k_lalt","label":"Alt","w":1.25,"action":{"kind":"KEY","payload":"LALT"}},
+          {"id":"k_space","label":"Space","w":5.5,"action":{"kind":"KEY","payload":"SPACE"}},
+          {"id":"k_ralt","label":"Alt","w":1.25,"action":{"kind":"KEY","payload":"RALT"}},
+          {"id":"k_fn","label":"Fn","w":1.25,"state_key":"fn_lock","action":{"kind":"KEY","payload":"FN"}},
+          {"id":"k_rctrl","label":"Ctrl","w":1.25,"action":{"kind":"KEY","payload":"RCTRL"}},
+          {"id":"k_left","label":"←","w":1,"action":{"kind":"KEY","payload":"LEFT"}},
+          {"id":"k_down","label":"↓","w":1,"action":{"kind":"KEY","payload":"DOWN"}},
+          {"id":"k_right","label":"→","w":1,"action":{"kind":"KEY","payload":"RIGHT"}}
         ]
       ]
     }

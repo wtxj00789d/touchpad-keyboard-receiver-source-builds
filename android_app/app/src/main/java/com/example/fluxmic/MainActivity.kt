@@ -1,6 +1,7 @@
 ﻿package com.example.fluxmic
 
 import android.Manifest
+import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -11,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.example.fluxmic.model.ExternalConnectCommand
 import com.example.fluxmic.ui.FluxMicTheme
 import com.example.fluxmic.ui.KeyboardPanelScreen
 import com.example.fluxmic.ui.viewmodel.MainViewModel
@@ -38,6 +40,14 @@ class MainActivity : ComponentActivity() {
                 KeyboardPanelScreen(viewModel = viewModel)
             }
         }
+
+        handleExternalCommandIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleExternalCommandIntent(intent)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -52,5 +62,10 @@ class MainActivity : ComponentActivity() {
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(WindowInsetsCompat.Type.systemBars())
+    }
+
+    private fun handleExternalCommandIntent(intent: Intent?) {
+        val command = ExternalConnectCommand.fromIntent(intent) ?: return
+        viewModel.handleExternalConnectCommand(command)
     }
 }
