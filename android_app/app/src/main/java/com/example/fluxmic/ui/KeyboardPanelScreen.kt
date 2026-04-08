@@ -9,6 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -26,14 +27,21 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -43,7 +51,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -83,16 +91,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.example.fluxmic.model.BackgroundVideoLayoutPolicy
+import com.example.fluxmic.model.BackgroundVideoLayoutState
 import com.example.fluxmic.model.KeyConfig
+import com.example.fluxmic.model.KeySurfaceMode
+import com.example.fluxmic.model.KeySurfaceStyleResolver
+import com.example.fluxmic.model.KeyboardBehavior
+import com.example.fluxmic.model.KeyboardLayerState
+import com.example.fluxmic.model.KeyboardLayoutMode
+import com.example.fluxmic.model.OverlayModel
 import com.example.fluxmic.model.PageConfig
+import com.example.fluxmic.model.ServerAddressFormatter
 import com.example.fluxmic.model.UiState
 import com.example.fluxmic.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -106,6 +125,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 private const val PREFS_NAME = "fluxmic_prefs"
@@ -114,6 +134,11 @@ private const val PREF_BG_VIDEO_URI = "background_video_uri" // legacy key for m
 private const val PREF_TEXT_MODE = "key_text_mode"
 private const val PREF_RIPPLE_MODE = "ripple_quality_mode"
 private const val GLASS_BUTTON_ALPHA = 0.10f
+private val OVERLAY_TEXT_SHADOW = Shadow(
+    color = Color.Black.copy(alpha = 0.82f),
+    offset = Offset(0f, 1.6f),
+    blurRadius = 3.2f
+)
 
 private enum class RipplePhase {
     Press,
@@ -171,15 +196,22 @@ private enum class RippleQualityMode(
 fun KeyboardPanelScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val density = LocalDensity.current
 
-    var urlInput by rememberSaveable { mutableStateOf(uiState.serverUrl) }
-    var showOverlay by rememberSaveable { mutableStateOf(false) }
+    var showOverlay by rememberSaveable { mutableStateOf(true) }
+    var showUrlBar by rememberSaveable { mutableStateOf(true) }
+    var keyboardHeightPx by remember { mutableIntStateOf(0) }
     var customBackgroundUri by rememberSaveable { mutableStateOf(loadBackgroundMediaUri(context)) }
     var keyTextMode by rememberSaveable {
         mutableStateOf(loadKeyTextMode(context))
     }
     var rippleQualityMode by rememberSaveable {
         mutableStateOf(loadRippleQualityMode(context))
+    }
+    val overlayBottomInset = if (showOverlay) {
+        with(density) { keyboardHeightPx.toDp() + 8.dp }
+    } else {
+        0.dp
     }
 
     val pickBackgroundLauncher = rememberLauncherForActivityResult(
@@ -194,12 +226,6 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
             }
             customBackgroundUri = uri.toString()
             saveBackgroundMediaUri(context, customBackgroundUri)
-        }
-    }
-
-    LaunchedEffect(uiState.serverUrl) {
-        if (!uiState.connecting) {
-            urlInput = uiState.serverUrl
         }
     }
 
@@ -218,85 +244,97 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
                 .background(Color.Transparent)
         )
 
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(10.dp)
         ) {
-            if (showOverlay) {
-                QuickBar(
-                    uiState = uiState,
-                    onConnectClick = {
-                        viewModel.setServerUrl(urlInput)
-                        if (uiState.connected) viewModel.disconnect() else viewModel.connect()
-                    },
-                    onMuteClick = { viewModel.toggleMute() },
-                    showControls = showOverlay,
-                    onToggleControls = { showOverlay = !showOverlay }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                ControlBar(
-                    urlInput = urlInput,
-                    onUrlChanged = {
-                        urlInput = it
-                        viewModel.setServerUrl(it)
-                    },
-                    hasCustomBackground = !customBackgroundUri.isNullOrBlank(),
-                    backgroundStatus = backgroundStatusText(context, customBackgroundUri),
-                    onPickBackground = { pickBackgroundLauncher.launch(arrayOf("video/*", "image/*")) },
-                    onClearBackground = {
-                        customBackgroundUri = null
-                        saveBackgroundMediaUri(context, null)
-                    },
-                    keyTextMode = keyTextMode,
-                    onTextModeToggle = {
-                        keyTextMode = keyTextMode.next()
-                        saveKeyTextMode(context, keyTextMode)
-                    },
-                    rippleQualityMode = rippleQualityMode,
-                    onRippleModeToggle = {
-                        rippleQualityMode = rippleQualityMode.next()
-                        saveRippleQualityMode(context, rippleQualityMode)
-                    }
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                StatusBar(uiState)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
             if (uiState.pages.isNotEmpty()) {
-                if (showOverlay) {
-                    GlassTabBar(
-                        pages = uiState.pages,
-                        selectedPageIndex = uiState.selectedPageIndex,
-                        onSelect = { viewModel.selectPage(it) }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
                 val page = uiState.pages[uiState.selectedPageIndex]
                 if (!page.keyRows.isNullOrEmpty()) {
                     FluxRowKeyboard(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .fillMaxSize(),
                         page = page,
                         stateFlags = uiState.stateFlags,
+                        layerState = uiState.keyboardLayerState,
                         keyTextMode = keyTextMode,
                         rippleQualityMode = rippleQualityMode,
+                        onKeyboardHeightChanged = { keyboardHeightPx = it },
                         onKeyDown = { viewModel.onKeyPressed(it) },
                         onKeyRepeat = { viewModel.onKeyRepeated(it) },
                         onKeyUp = { viewModel.onKeyReleased(it) }
                     )
                 } else {
+                    LaunchedEffect(page.id) {
+                        keyboardHeightPx = 0
+                    }
                     FluxKeyGrid(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .fillMaxSize(),
                         page = page,
                         stateFlags = uiState.stateFlags,
+                        layerState = uiState.keyboardLayerState,
                         keyTextMode = keyTextMode,
                         rippleQualityMode = rippleQualityMode,
                         onTrigger = { key, longPress ->
                             viewModel.onKeyTriggered(key, longPress)
                         }
                     )
+                }
+
+                if (showOverlay) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight()
+                            .padding(bottom = overlayBottomInset)
+                            .align(Alignment.TopCenter)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OverlayCards(
+                            uiState = uiState,
+                            showUrlBar = showUrlBar,
+                            onAddressEditorToggle = { viewModel.toggleAddressEditor() },
+                            onConnectClick = {
+                                if (uiState.connected) viewModel.disconnect() else viewModel.connect()
+                            },
+                            onMuteClick = { viewModel.toggleMute() },
+                            systemVolume = uiState.systemVolume,
+                            onVolumeChange = { viewModel.setRemoteVolume(it) },
+                            onWindowMinimize = { viewModel.minimizeActiveWindow() },
+                            onWindowMaximize = { viewModel.toggleMaximizeActiveWindow() },
+                            onWindowClose = { viewModel.closeActiveWindow() },
+                            layoutMode = uiState.keyboardLayoutMode,
+                            onLayoutModeToggle = {
+                                viewModel.setKeyboardLayoutMode(uiState.keyboardLayoutMode.next())
+                            },
+                            hasCustomBackground = !customBackgroundUri.isNullOrBlank(),
+                            backgroundStatus = backgroundStatusText(context, customBackgroundUri),
+                            onPickBackground = { pickBackgroundLauncher.launch(arrayOf("video/*", "image/*")) },
+                            onClearBackground = {
+                                customBackgroundUri = null
+                                saveBackgroundMediaUri(context, null)
+                            },
+                            keyTextMode = keyTextMode,
+                            onTextModeToggle = {
+                                keyTextMode = keyTextMode.next()
+                                saveKeyTextMode(context, keyTextMode)
+                            },
+                            rippleQualityMode = rippleQualityMode,
+                            onRippleModeToggle = {
+                                rippleQualityMode = rippleQualityMode.next()
+                                saveRippleQualityMode(context, rippleQualityMode)
+                            },
+                            onToggleUrlBar = { showUrlBar = !showUrlBar }
+                        )
+                        GlassTabBar(
+                            pages = uiState.pages,
+                            selectedPageIndex = uiState.selectedPageIndex,
+                            onSelect = { viewModel.selectPage(it) }
+                        )
+                    }
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -360,6 +398,10 @@ private fun GlassTabBar(
                             Text(
                                 text = page.title,
                                 modifier = Modifier.align(Alignment.Center),
+                                style = overlayReadableStyle(
+                                    base = MaterialTheme.typography.labelLarge,
+                                    color = if (selected) Color.White else Color.White.copy(alpha = 0.86f)
+                                ),
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
                             )
                         }
@@ -374,6 +416,10 @@ private enum class BackgroundSourceKind {
     IMAGE,
     VIDEO,
     UNKNOWN
+}
+
+private fun overlayReadableStyle(base: TextStyle, color: Color): TextStyle {
+    return base.copy(color = color, shadow = OVERLAY_TEXT_SHADOW)
 }
 
 @Composable
@@ -422,18 +468,7 @@ private fun MediaOrGradientBackground(
     }
 
     if (mediaUri == null) {
-        Box(
-            modifier = modifier.background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF0B1D2C),
-                        Color(0xFF1C4968),
-                        Color(0xFF153046),
-                        Color(0xFF2A6F97)
-                    )
-                )
-            )
-        )
+        GradientBackground(modifier = modifier)
         return
     }
 
@@ -443,22 +478,95 @@ private fun MediaOrGradientBackground(
             repeatMode = Player.REPEAT_MODE_ALL
             volume = 0f
             playWhenReady = true
-            prepare()
         }
     }
+    var layoutRefreshTick by remember(mediaUri.toString()) { mutableIntStateOf(0) }
+    var appliedLayoutRefreshTick by remember(mediaUri.toString()) { mutableIntStateOf(0) }
+    var layoutState by remember(mediaUri.toString()) { mutableStateOf(BackgroundVideoLayoutState()) }
     DisposableEffect(player) {
-        onDispose { player.release() }
+        val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                val result = BackgroundVideoLayoutPolicy.reduce(
+                    previousState = layoutState,
+                    videoWidth = videoSize.width,
+                    videoHeight = videoSize.height,
+                    firstFrameRendered = false
+                )
+                layoutState = result.state
+                if (result.shouldRequestLayout) {
+                    layoutRefreshTick += 1
+                }
+            }
+
+            override fun onRenderedFirstFrame() {
+                val currentSize = player.videoSize
+                val result = BackgroundVideoLayoutPolicy.reduce(
+                    previousState = layoutState,
+                    videoWidth = if (currentSize == VideoSize.UNKNOWN) 0 else currentSize.width,
+                    videoHeight = if (currentSize == VideoSize.UNKNOWN) 0 else currentSize.height,
+                    firstFrameRendered = true
+                )
+                layoutState = result.state
+                if (result.shouldRequestLayout) {
+                    layoutRefreshTick += 1
+                }
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
     }
 
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                this.player = player
-            }
-        },
-        modifier = modifier
+    Box(modifier = modifier) {
+        GradientBackground(modifier = Modifier.fillMaxSize())
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    useController = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    this.player = player
+                    if (player.playbackState == Player.STATE_IDLE) {
+                        player.prepare()
+                    }
+                }
+            },
+            update = { playerView ->
+                if (playerView.player !== player) {
+                    playerView.player = player
+                }
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                if (player.playbackState == Player.STATE_IDLE) {
+                    player.prepare()
+                }
+                if (layoutRefreshTick > appliedLayoutRefreshTick) {
+                    appliedLayoutRefreshTick = layoutRefreshTick
+                    playerView.post {
+                        playerView.requestLayout()
+                        playerView.invalidate()
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
+private fun GradientBackground(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.background(
+            Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF0B1D2C),
+                    Color(0xFF1C4968),
+                    Color(0xFF153046),
+                    Color(0xFF2A6F97)
+                )
+            )
+        )
     )
 }
 
@@ -467,8 +575,10 @@ private fun FluxRowKeyboard(
     modifier: Modifier,
     page: PageConfig,
     stateFlags: Map<String, Boolean>,
+    layerState: KeyboardLayerState,
     keyTextMode: KeyTextMode,
     rippleQualityMode: RippleQualityMode,
+    onKeyboardHeightChanged: (Int) -> Unit = {},
     onKeyDown: (KeyConfig) -> Unit,
     onKeyRepeat: (KeyConfig) -> Unit,
     onKeyUp: (KeyConfig) -> Unit
@@ -490,15 +600,7 @@ private fun FluxRowKeyboard(
     var keyboardRootOffset by remember(page.id) { mutableStateOf(Offset.Zero) }
     val pressStartRadiusPx = with(density) { 10.dp.toPx() }
     val ripple: Indication = rememberRipple(bounded = true)
-    val repeatDelayMs = 360L
-    val repeatIntervalMs = 52L
-    val shiftActive by remember(rows, keyPressCount) {
-        derivedStateOf {
-            rows.flatten().any { rowKey ->
-                (keyPressCount[rowKey.id] ?: 0) > 0 && isShiftKey(rowKey)
-            }
-        }
-    }
+    val repeatProfile = remember { KeyboardBehavior.defaultRepeatProfile() }
 
     DisposableEffect(page.id) {
         onDispose {
@@ -507,11 +609,38 @@ private fun FluxRowKeyboard(
         }
     }
 
-    Box(
+    val keySpacing = 8.dp
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .onGloballyPositioned { keyboardRootOffset = it.positionInRoot() }
     ) {
+        val keySpacingPx = with(density) { keySpacing.toPx() }
+        val availableWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
+        val availableHeightPx = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
+        val rowCount = rows.size.coerceAtLeast(1)
+        val widthLimitedUnitPx = rows.map { rowKeys ->
+            val unitSum = rowKeys.sumOf { it.width.coerceAtLeast(0.5f).toDouble() }.toFloat()
+            val gaps = (rowKeys.size - 1).coerceAtLeast(0)
+            if (unitSum <= 0f) {
+                Float.MAX_VALUE
+            } else {
+                ((availableWidthPx - keySpacingPx * gaps) / unitSum).coerceAtLeast(0f)
+            }
+        }.minOrNull() ?: 0f
+        val heightLimitedUnitPx =
+            ((availableHeightPx - keySpacingPx * (rowCount - 1)) / rowCount.toFloat()).coerceAtLeast(0f)
+        val keyUnitPx = min(widthLimitedUnitPx, heightLimitedUnitPx).coerceAtLeast(0f)
+        val keyHeightDp = with(density) { keyUnitPx.toDp() }
+        val keyboardHeightDp = with(density) {
+            (keyUnitPx * rowCount + keySpacingPx * (rowCount - 1)).toDp()
+        }
+        val keyboardHeightPx = (keyUnitPx * rowCount + keySpacingPx * (rowCount - 1)).roundToInt()
+
+        LaunchedEffect(page.id, keyboardHeightPx) {
+            onKeyboardHeightChanged(keyboardHeightPx.coerceAtLeast(0))
+        }
+
         BackgroundRippleLayer(
             ripples = backgroundRipples,
             rippleQualityMode = rippleQualityMode,
@@ -519,119 +648,475 @@ private fun FluxRowKeyboard(
         )
 
         Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(keyboardHeightDp)
+                .align(Alignment.BottomStart),
+            verticalArrangement = Arrangement.spacedBy(keySpacing)
         ) {
             rows.forEach { rowKeys ->
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    rowKeys.forEach { key ->
-                        val isPressed = (keyPressCount[key.id] ?: 0) > 0
-                        val isActive = key.stateKey?.let { stateFlags[it] } == true
+                val rowUnitSum = rowKeys.sumOf { it.width.coerceAtLeast(0.5f).toDouble() }.toFloat()
+                val rowGaps = (rowKeys.size - 1).coerceAtLeast(0)
+                val baseRowWidthPx = rowUnitSum * keyUnitPx + keySpacingPx * rowGaps
+                val extraRowWidthPx = (availableWidthPx - baseRowWidthPx).coerceAtLeast(0f)
+                val extraUnitBudget = if (keyUnitPx > 0f) extraRowWidthPx / keyUnitPx else 0f
+                val stretchWeights = rowKeys.map { (it.width.coerceAtLeast(0.5f) - 1f).coerceAtLeast(0f) }
+                val stretchWeightTotal = stretchWeights.sum().coerceAtLeast(0f)
 
-                        KeyTile(
-                            key = key,
-                            selected = isPressed,
-                            active = isActive,
-                            keyTextMode = keyTextMode,
-                            shiftActive = shiftActive,
-                            modifier = Modifier
-                                .weight(key.width.coerceAtLeast(0.5f))
-                                .onGloballyPositioned { coordinates ->
-                                    keyRootOffsets[key.id] = coordinates.positionInRoot()
-                                    val base = coordinates.size.height.toFloat()
-                                    keyRippleRadius[key.id] = base * 1.38f
-                                }
-                                .indication(
-                                    interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() },
-                                    indication = ripple
-                                )
-                                .pointerInput(page.id, key.id) {
-                                    awaitEachGesture {
-                                        val down = awaitFirstDown(requireUnconsumed = false)
-                                        val pointerId = down.id.value
-                                        val alreadyTracked = pointerToKey.containsKey(pointerId)
-                                        if (!alreadyTracked && pointerToKey.size >= 3) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(keyHeightDp),
+                    horizontalArrangement = Arrangement.spacedBy(keySpacing)
+                ) {
+                    rowKeys.forEachIndexed { index, key ->
+                            val baseWeight = key.width.coerceAtLeast(0.5f)
+                            val stretchWeight = stretchWeights[index]
+                            val stretchUnits = if (stretchWeightTotal > 0f) {
+                                extraUnitBudget * (stretchWeight / stretchWeightTotal)
+                            } else {
+                                0f
+                            }
+                            val effectiveWeight = (baseWeight + stretchUnits).coerceAtLeast(0.5f)
+                            val isPressed = (keyPressCount[key.id] ?: 0) > 0
+                            val isActive = key.stateKey?.let { stateFlags[it] } == true
+
+                            KeyTile(
+                                key = key,
+                                selected = isPressed,
+                                active = isActive,
+                                keyTextMode = keyTextMode,
+                                layerState = layerState,
+                                modifier = Modifier
+                                    .weight(effectiveWeight)
+                                    .fillMaxHeight()
+                                    .onGloballyPositioned { coordinates ->
+                                        keyRootOffsets[key.id] = coordinates.positionInRoot()
+                                        val base = min(coordinates.size.width, coordinates.size.height).toFloat()
+                                        keyRippleRadius[key.id] = base * 1.38f
+                                    }
+                                    .indication(
+                                        interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() },
+                                        indication = ripple
+                                    )
+                                    .pointerInput(page.id, key.id) {
+                                        awaitEachGesture {
+                                            val down = awaitFirstDown(requireUnconsumed = false)
+                                            val pointerId = down.id.value
+                                            val alreadyTracked = pointerToKey.containsKey(pointerId)
+                                            if (!alreadyTracked && pointerToKey.size >= KeyboardBehavior.maxActiveKeys()) {
+                                                while (true) {
+                                                    val event = awaitPointerEvent()
+                                                    val change = event.changes.firstOrNull { it.id == down.id } ?: continue
+                                                    if (!change.pressed) break
+                                                }
+                                                return@awaitEachGesture
+                                            }
+
+                                            pointerToKey[pointerId] = key.id
+                                            val keyRoot = keyRootOffsets[key.id]
+                                            val localOrigin = if (keyRoot != null) {
+                                                (keyRoot - keyboardRootOffset) + down.position
+                                            } else {
+                                                down.position
+                                            }
+                                            val rippleId = emitGlobalRipple(
+                                                scope = scope,
+                                                ripples = backgroundRipples,
+                                                id = nextRippleId++,
+                                                origin = localOrigin,
+                                                maxRadius = keyRippleRadius[key.id],
+                                                startRadius = pressStartRadiusPx,
+                                                maxConcurrentRipples = rippleQualityMode.maxConcurrentRipples
+                                            )
+                                            pointerToRippleId[pointerId] = rippleId
+
+                                            keyPressCount[key.id] = (keyPressCount[key.id] ?: 0) + 1
+                                            if ((keyPressCount[key.id] ?: 0) == 1) {
+                                                val interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() }
+                                                val press = PressInteraction.Press(down.position)
+                                                activePresses[key.id] = press
+                                                interactionSource.tryEmit(press)
+
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onKeyDown(key)
+                                                if (key.action.kind.name == "KEY") {
+                                                    keyRepeatJobs.remove(key.id)?.cancel()
+                                                    keyRepeatJobs[key.id] = scope.launch {
+                                                        delay(repeatProfile.initialDelayMs)
+                                                        while ((keyPressCount[key.id] ?: 0) > 0) {
+                                                            onKeyRepeat(key)
+                                                            delay(repeatProfile.repeatIntervalMs)
+                                                        }
+                                                    }
+                                                }
+                                            }
+
                                             while (true) {
                                                 val event = awaitPointerEvent()
                                                 val change = event.changes.firstOrNull { it.id == down.id } ?: continue
-                                                if (!change.pressed) break
-                                            }
-                                            return@awaitEachGesture
-                                        }
-
-                                        pointerToKey[pointerId] = key.id
-                                        val keyRoot = keyRootOffsets[key.id]
-                                        val localOrigin = if (keyRoot != null) {
-                                            (keyRoot - keyboardRootOffset) + down.position
-                                        } else {
-                                            down.position
-                                        }
-                                        val rippleId = emitGlobalRipple(
-                                            scope = scope,
-                                            ripples = backgroundRipples,
-                                            id = nextRippleId++,
-                                            origin = localOrigin,
-                                            maxRadius = keyRippleRadius[key.id],
-                                            startRadius = pressStartRadiusPx,
-                                            maxConcurrentRipples = rippleQualityMode.maxConcurrentRipples
-                                        )
-                                        pointerToRippleId[pointerId] = rippleId
-
-                                        keyPressCount[key.id] = (keyPressCount[key.id] ?: 0) + 1
-                                        if ((keyPressCount[key.id] ?: 0) == 1) {
-                                            val interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() }
-                                            val press = PressInteraction.Press(down.position)
-                                            activePresses[key.id] = press
-                                            interactionSource.tryEmit(press)
-
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onKeyDown(key)
-                                            if (key.action.kind.name == "KEY") {
-                                                keyRepeatJobs.remove(key.id)?.cancel()
-                                                keyRepeatJobs[key.id] = scope.launch {
-                                                    delay(repeatDelayMs)
-                                                    while ((keyPressCount[key.id] ?: 0) > 0) {
-                                                        onKeyRepeat(key)
-                                                        delay(repeatIntervalMs)
+                                                if (!change.pressed) {
+                                                    val releasedRippleId = pointerToRippleId.remove(pointerId)
+                                                    if (releasedRippleId != null) {
+                                                        releaseGlobalRipple(
+                                                            scope = scope,
+                                                            ripples = backgroundRipples,
+                                                            rippleId = releasedRippleId
+                                                        )
                                                     }
-                                                }
-                                            }
-                                        }
-
-                                        while (true) {
-                                        val event = awaitPointerEvent()
-                                        val change = event.changes.firstOrNull { it.id == down.id } ?: continue
-                                        if (!change.pressed) {
-                                            val releasedRippleId = pointerToRippleId.remove(pointerId)
-                                            if (releasedRippleId != null) {
-                                                releaseGlobalRipple(
-                                                    scope = scope,
-                                                    ripples = backgroundRipples,
-                                                    rippleId = releasedRippleId
-                                                )
-                                            }
-                                            pointerToKey.remove(pointerId)
-                                            val left = (keyPressCount[key.id] ?: 1) - 1
-                                            if (left <= 0) {
-                                                    keyPressCount.remove(key.id)
-                                                    keyRepeatJobs.remove(key.id)?.cancel()
-                                                    val interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() }
-                                                    val press = activePresses.remove(key.id)
-                                                    if (press != null) {
-                                                        interactionSource.tryEmit(PressInteraction.Release(press))
+                                                    pointerToKey.remove(pointerId)
+                                                    val left = (keyPressCount[key.id] ?: 1) - 1
+                                                    if (left <= 0) {
+                                                        keyPressCount.remove(key.id)
+                                                        keyRepeatJobs.remove(key.id)?.cancel()
+                                                        val interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() }
+                                                        val press = activePresses.remove(key.id)
+                                                        if (press != null) {
+                                                            interactionSource.tryEmit(PressInteraction.Release(press))
+                                                        }
+                                                        onKeyUp(key)
+                                                    } else {
+                                                        keyPressCount[key.id] = left
                                                     }
-                                                    onKeyUp(key)
-                                                } else {
-                                                    keyPressCount[key.id] = left
+                                                    break
                                                 }
-                                                break
                                             }
                                         }
                                     }
+                            )
+                        }
+                    }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverlayCards(
+    uiState: UiState,
+    showUrlBar: Boolean,
+    onAddressEditorToggle: () -> Unit,
+    onConnectClick: () -> Unit,
+    onMuteClick: () -> Unit,
+    systemVolume: Float,
+    onVolumeChange: (Float) -> Unit,
+    onWindowMinimize: () -> Unit,
+    onWindowMaximize: () -> Unit,
+    onWindowClose: () -> Unit,
+    layoutMode: KeyboardLayoutMode,
+    onLayoutModeToggle: () -> Unit,
+    hasCustomBackground: Boolean,
+    backgroundStatus: String,
+    onPickBackground: () -> Unit,
+    onClearBackground: () -> Unit,
+    keyTextMode: KeyTextMode,
+    onTextModeToggle: () -> Unit,
+    rippleQualityMode: RippleQualityMode,
+    onRippleModeToggle: () -> Unit,
+    onToggleUrlBar: () -> Unit
+) {
+    val overlayModel = remember(
+        uiState.activeWindow,
+        uiState.windowControls,
+        uiState.connected,
+        uiState.mute,
+        systemVolume
+    ) {
+        OverlayModel.fromState(
+            activeWindow = uiState.activeWindow,
+            windowControls = uiState.windowControls,
+            connected = uiState.connected,
+            muted = uiState.mute,
+            volume = systemVolume
+        )
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (showUrlBar) {
+            GlassOverlayCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    InlineAddressEditorCard(
+                        modifier = Modifier.weight(1f),
+                        displayValue = if (uiState.addressEditorExpanded) {
+                            uiState.serverAddressDraft
+                        } else {
+                            ServerAddressFormatter.toDisplayValue(uiState.serverUrl)
+                        },
+                        expanded = uiState.addressEditorExpanded,
+                        onClick = onAddressEditorToggle
+                    )
+                    Button(onClick = onConnectClick, modifier = Modifier.height(56.dp)) {
+                        Text(
+                            if (uiState.connected) "Disconnect" else "Connect",
+                            style = overlayReadableStyle(
+                                base = MaterialTheme.typography.labelLarge,
+                                color = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            GlassOverlayCard(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .heightIn(min = 126.dp)
+            ) {
+                Text(
+                    text = "Realtime",
+                    style = overlayReadableStyle(
+                        base = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.92f)
+                    ),
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OverlayMetric("Conn", uiState.statusText)
+                    OverlayMetric("Mic", "${(uiState.micLevel * 100).toInt()}%")
+                    OverlayMetric("Mute", if (uiState.mute) "On" else "Off")
+                    OverlayMetric("Layout", layoutMode.displayName)
+                }
+            }
+
+            GlassOverlayCard(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .heightIn(min = 126.dp)
+            ) {
+                Text(
+                    text = if (overlayModel.usingFallbackActions) "Context" else "Active Window",
+                    style = overlayReadableStyle(
+                        base = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.92f)
+                    ),
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = overlayModel.windowTitle,
+                    style = overlayReadableStyle(
+                        base = MaterialTheme.typography.bodyMedium,
+                        color = Color.White
+                    ),
+                    maxLines = 2
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                if (!overlayModel.usingFallbackActions) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        overlayModel.contextActions.forEach { action ->
+                            OutlinedButton(
+                                onClick = when (action.id) {
+                                    "minimize" -> onWindowMinimize
+                                    "maximize" -> onWindowMaximize
+                                    "close" -> onWindowClose
+                                    else -> ({})
+                                },
+                                colors = glassOutlinedButtonColors(),
+                                border = glassOutlinedBorder(),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    action.title,
+                                    style = overlayReadableStyle(
+                                        base = MaterialTheme.typography.labelMedium,
+                                        color = Color.White
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                } else {
+                    Text(
+                        text = "Quick Controls",
+                        style = overlayReadableStyle(
+                            base = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.82f)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        overlayModel.contextActions
+                            .filter { it.id != "volume" }
+                            .forEach { action ->
+                                OutlinedButton(
+                                    onClick = when (action.id) {
+                                        "connection" -> onConnectClick
+                                        "mute" -> onMuteClick
+                                        else -> ({})
+                                    },
+                                    colors = glassOutlinedButtonColors(),
+                                    border = glassOutlinedBorder(),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        action.title,
+                                        style = overlayReadableStyle(
+                                            base = MaterialTheme.typography.labelMedium,
+                                            color = Color.White
+                                        )
+                                    )
                                 }
+                            }
+                    }
+                    if (overlayModel.showVolumeCapsule) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        GlassVolumeCapsule(
+                            systemVolume = overlayModel.volumeLevel,
+                            onVolumeChange = onVolumeChange
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+                Text(
+                    text = if (uiState.lastEvent.isNotBlank()) "Event: ${uiState.lastEvent}" else "Event: -",
+                    style = overlayReadableStyle(
+                        base = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.85f)
+                    ),
+                    maxLines = 2
+                )
+            }
+
+            GlassOverlayCard(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .heightIn(min = 126.dp)
+            ) {
+                Text(
+                    text = "Settings",
+                    style = overlayReadableStyle(
+                        base = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.92f)
+                    ),
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onPickBackground,
+                            colors = glassOutlinedButtonColors(),
+                            border = glassOutlinedBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Import BG",
+                                style = overlayReadableStyle(
+                                    base = MaterialTheme.typography.labelLarge,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onClearBackground,
+                            enabled = hasCustomBackground,
+                            colors = glassOutlinedButtonColors(),
+                            border = glassOutlinedBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Clear BG",
+                                style = overlayReadableStyle(
+                                    base = MaterialTheme.typography.labelLarge,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onLayoutModeToggle,
+                            colors = glassOutlinedButtonColors(),
+                            border = glassOutlinedBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Layout: ${layoutMode.displayName}",
+                                style = overlayReadableStyle(
+                                    base = MaterialTheme.typography.labelLarge,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onTextModeToggle,
+                            colors = glassOutlinedButtonColors(),
+                            border = glassOutlinedBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Text: ${keyTextMode.name}",
+                                style = overlayReadableStyle(
+                                    base = MaterialTheme.typography.labelLarge,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onToggleUrlBar,
+                            colors = glassOutlinedButtonColors(),
+                            border = glassOutlinedBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                if (showUrlBar) "Hide Address" else "Show Address",
+                                style = overlayReadableStyle(
+                                    base = MaterialTheme.typography.labelLarge,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onRippleModeToggle,
+                            colors = glassOutlinedButtonColors(),
+                            border = glassOutlinedBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Ripple: ${rippleQualityMode.title}",
+                                style = overlayReadableStyle(
+                                    base = MaterialTheme.typography.labelLarge,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                        Text(
+                            text = backgroundStatus,
+                            style = overlayReadableStyle(
+                                base = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.88f)
+                            )
                         )
                     }
                 }
@@ -641,148 +1126,164 @@ private fun FluxRowKeyboard(
 }
 
 @Composable
-private fun QuickBar(
-    uiState: UiState,
-    onConnectClick: () -> Unit,
-    onMuteClick: () -> Unit,
-    showControls: Boolean,
-    onToggleControls: () -> Unit
+private fun InlineAddressEditorCard(
+    displayValue: String,
+    expanded: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    val borderColor by animateColorAsState(
+        targetValue = if (expanded) {
+            Color.White.copy(alpha = 0.34f)
+        } else {
+            Color.White.copy(alpha = 0.18f)
+        },
+        label = "address-editor-border"
+    )
+    val backgroundColor by animateColorAsState(
+        targetValue = if (expanded) {
+            Color.White.copy(alpha = 0.11f)
+        } else {
+            Color.White.copy(alpha = 0.05f)
+        },
+        label = "address-editor-bg"
+    )
+
+    Column(
+        modifier = modifier
+            .background(backgroundColor, RoundedCornerShape(16.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = "Keyboard",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f)
+            text = if (expanded) "Server Address · Editing" else "Server Address",
+            style = overlayReadableStyle(
+                base = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.88f)
+            )
         )
-
-        Button(onClick = onConnectClick) {
-            Text(if (uiState.connected) "Disconnect" else "Connect")
-        }
-
-        OutlinedButton(
-            onClick = onMuteClick,
-            colors = glassOutlinedButtonColors(),
-            border = glassOutlinedBorder()
-        ) {
-            Text(if (uiState.mute) "Unmute" else "Mute")
-        }
-
-        OutlinedButton(
-            onClick = onToggleControls,
-            colors = glassOutlinedButtonColors(),
-            border = glassOutlinedBorder()
-        ) {
-            Text(if (showControls) "Hide URL" else "URL")
-        }
+        Text(
+            text = displayValue.ifBlank { "127.0.0.1:8765" },
+            style = overlayReadableStyle(
+                base = MaterialTheme.typography.titleMedium,
+                color = Color.White
+            ),
+            maxLines = 1
+        )
+        Text(
+            text = if (expanded) {
+                "Type with the keyboard below. ws:// is added automatically."
+            } else {
+                "Tap to edit the saved address in place."
+            },
+            style = overlayReadableStyle(
+                base = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.78f)
+            ),
+            maxLines = 2
+        )
     }
 }
 
 @Composable
-private fun ControlBar(
-    urlInput: String,
-    onUrlChanged: (String) -> Unit,
-    hasCustomBackground: Boolean,
-    backgroundStatus: String,
-    onPickBackground: () -> Unit,
-    onClearBackground: () -> Unit,
-    keyTextMode: KeyTextMode,
-    onTextModeToggle: () -> Unit,
-    rippleQualityMode: RippleQualityMode,
-    onRippleModeToggle: () -> Unit
+private fun GlassOverlayCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(
+        modifier = modifier
+            .background(Color.White.copy(alpha = GLASS_BUTTON_ALPHA), RoundedCornerShape(12.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(12.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.Top,
+        content = content
+    )
+}
+
+@Composable
+private fun GlassVolumeCapsule(
+    systemVolume: Float,
+    onVolumeChange: (Float) -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var interactionTick by remember { mutableLongStateOf(0L) }
+    val levelPercent = (systemVolume.coerceIn(0f, 1f) * 100).toInt()
+
+    LaunchedEffect(expanded, interactionTick) {
+        if (!expanded) return@LaunchedEffect
+        val snapshot = interactionTick
+        delay(1500)
+        if (interactionTick == snapshot) {
+            expanded = false
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .background(Color.White.copy(alpha = GLASS_BUTTON_ALPHA), RoundedCornerShape(12.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
+            .clickable {
+                expanded = true
+                interactionTick = SystemClock.elapsedRealtime()
+            }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = urlInput,
-                onValueChange = onUrlChanged,
-                label = { Text("Server WS URL") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-                colors = glassTextFieldColors()
+            Text(
+                text = "Volume",
+                style = overlayReadableStyle(
+                    base = MaterialTheme.typography.labelLarge,
+                    color = Color.White
+                )
+            )
+            Text(
+                text = "$levelPercent%",
+                style = overlayReadableStyle(
+                    base = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.92f)
+                )
             )
         }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = onPickBackground,
-                colors = glassOutlinedButtonColors(),
-                border = glassOutlinedBorder()
-            ) {
-                Text("Import BG")
-            }
-            OutlinedButton(
-                onClick = onClearBackground,
-                enabled = hasCustomBackground,
-                colors = glassOutlinedButtonColors(),
-                border = glassOutlinedBorder()
-            ) {
-                Text("Clear BG")
-            }
-            OutlinedButton(
-                onClick = onTextModeToggle,
-                colors = glassOutlinedButtonColors(),
-                border = glassOutlinedBorder()
-            ) {
-                Text("Text: ${keyTextMode.name}")
-            }
-            OutlinedButton(
-                onClick = onRippleModeToggle,
-                colors = glassOutlinedButtonColors(),
-                border = glassOutlinedBorder()
-            ) {
-                Text("Ripple: ${rippleQualityMode.title}")
-            }
-            Text(
-                text = backgroundStatus,
-                style = MaterialTheme.typography.labelMedium.copy(color = Color.White)
+        if (expanded) {
+            Slider(
+                value = systemVolume.coerceIn(0f, 1f),
+                onValueChange = {
+                    expanded = true
+                    interactionTick = SystemClock.elapsedRealtime()
+                    onVolumeChange(it)
+                },
+                valueRange = 0f..1f,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
 }
 
 @Composable
-private fun StatusBar(uiState: UiState) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            StatusItem("Conn", uiState.statusText)
-            StatusItem("Mic", "${(uiState.micLevel * 100).toInt()}%")
-            StatusItem("Mute", uiState.mute.toString())
-            StatusItem("Layout", uiState.layoutName)
-        }
-        if (uiState.activeWindow.isNotBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Active: ${uiState.activeWindow}",
-                style = MaterialTheme.typography.labelMedium.copy(color = Color.White)
-            )
-        }
-        if (uiState.lastEvent.isNotBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Event: ${uiState.lastEvent}",
-                style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(alpha = 0.92f))
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatusItem(label: String, value: String) {
+private fun OverlayMetric(label: String, value: String) {
     Column {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(alpha = 0.88f))
+            style = overlayReadableStyle(
+                base = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.80f)
+            )
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+            style = overlayReadableStyle(
+                base = MaterialTheme.typography.bodyMedium,
+                color = Color.White
+            ),
             fontWeight = FontWeight.SemiBold
         )
     }
@@ -793,6 +1294,7 @@ private fun FluxKeyGrid(
     modifier: Modifier,
     page: PageConfig,
     stateFlags: Map<String, Boolean>,
+    layerState: KeyboardLayerState,
     keyTextMode: KeyTextMode,
     rippleQualityMode: RippleQualityMode,
     onTrigger: (key: KeyConfig, longPress: Boolean) -> Unit
@@ -921,7 +1423,7 @@ private fun FluxKeyGrid(
                             selected = highlightedIndex == idx,
                             active = key?.stateKey?.let { stateFlags[it] } == true,
                             keyTextMode = keyTextMode,
-                            shiftActive = false,
+                            layerState = layerState,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -937,33 +1439,44 @@ private fun KeyTile(
     selected: Boolean,
     active: Boolean,
     keyTextMode: KeyTextMode,
-    shiftActive: Boolean,
+    layerState: KeyboardLayerState,
     modifier: Modifier = Modifier
 ) {
-    val isCapsKey = remember(key?.id, key?.label, key?.action?.payload, key?.stateKey) {
+    val isLockKey = remember(key?.id, key?.label, key?.action?.payload, key?.stateKey) {
         isCapsLockKey(key)
+            || isFnLockKey(key)
     }
-    val capsOn = isCapsKey && active
+    val lockOn = isLockKey && active
     val capsLedAlpha by animateFloatAsState(
-        targetValue = if (capsOn) 1f else 0f,
+        targetValue = if (lockOn) 1f else 0f,
         animationSpec = tween(durationMillis = 140, easing = LinearOutSlowInEasing),
         label = "caps-led-alpha"
     )
-    val glassColor by animateColorAsState(
-        targetValue = when {
-            selected -> Color.White.copy(alpha = GLASS_BUTTON_ALPHA + 0.08f)
-            capsOn -> Color.White.copy(alpha = GLASS_BUTTON_ALPHA + 0.06f)
-            active -> Color.White.copy(alpha = GLASS_BUTTON_ALPHA + 0.04f)
-            else -> Color.White.copy(alpha = GLASS_BUTTON_ALPHA)
-        },
-        label = "key-bg"
+    val surfaceMode = remember(keyTextMode) {
+        when (keyTextMode) {
+            KeyTextMode.NORMAL -> KeySurfaceMode.NORMAL
+            KeyTextMode.LIGHT -> KeySurfaceMode.LIGHT
+            KeyTextMode.DARK -> KeySurfaceMode.DARK
+        }
+    }
+    val surfaceStyle = remember(surfaceMode, selected, lockOn, active) {
+        KeySurfaceStyleResolver.resolve(
+            mode = surfaceMode,
+            selected = selected,
+            lockOn = lockOn,
+            active = active
+        )
+    }
+    val fillTopColor by animateColorAsState(
+        targetValue = Color.White.copy(alpha = surfaceStyle.fillTopAlpha),
+        label = "key-fill-top"
+    )
+    val fillBottomColor by animateColorAsState(
+        targetValue = Color.White.copy(alpha = surfaceStyle.fillBottomAlpha),
+        label = "key-fill-bottom"
     )
     val borderColor by animateColorAsState(
-        targetValue = when {
-            selected -> Color.White.copy(alpha = 0.34f)
-            capsOn -> Color.White.copy(alpha = 0.42f)
-            else -> Color.White.copy(alpha = 0.18f)
-        },
+        targetValue = Color.White.copy(alpha = surfaceStyle.borderAlpha),
         label = "key-border"
     )
 
@@ -978,15 +1491,15 @@ private fun KeyTile(
             }
             KeyTextMode.LIGHT -> {
                 Color.Black to Shadow(
-                    color = Color.White.copy(alpha = 0.55f),
-                    offset = Offset(0f, 1f),
-                    blurRadius = 1.2f
+                    color = Color.White.copy(alpha = 0.95f),
+                    offset = Offset.Zero,
+                    blurRadius = 2.4f
                 )
             }
             KeyTextMode.DARK -> Color.White to null
         }
     }
-    val displayLabel = remember(key, shiftActive) { keyDisplayLabel(key, shiftActive) }
+    val displayLabel = remember(key, layerState) { keyDisplayLabel(key, layerState) }
 
     Box(
         modifier = modifier,
@@ -994,7 +1507,12 @@ private fun KeyTile(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(glassColor, RoundedCornerShape(12.dp))
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(fillTopColor, fillBottomColor)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
                 .border(
                     1.dp,
                     borderColor,
@@ -1027,7 +1545,7 @@ private fun KeyTile(
             }
         }
 
-        if (isCapsKey) {
+        if (isLockKey) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -1061,23 +1579,35 @@ private fun isShiftKey(key: KeyConfig?): Boolean {
     return token == "SHIFT" || token == "LSHIFT" || token == "RSHIFT"
 }
 
-private fun keyDisplayLabel(key: KeyConfig?, shiftActive: Boolean): String {
+private fun isFnLockKey(key: KeyConfig?): Boolean {
+    if (key == null) return false
+    if (key.stateKey.equals("fn_lock", ignoreCase = true)) return true
+    if (key.id.equals("k_fn", ignoreCase = true)) return true
+    if (key.label.equals("Fn", ignoreCase = true)) return true
+    return actionToken(key) == "FN"
+}
+
+private fun keyDisplayLabel(key: KeyConfig?, layerState: KeyboardLayerState): String {
     if (key == null) return ""
     val original = key.label?.takeIf { it.isNotBlank() } ?: key.id
     val token = actionToken(key)
     if (token.isEmpty()) return original
 
+    if (layerState.fnLocked) {
+        return KeyboardBehavior.remapLabel(original, key.id, layerState)
+    }
+
     if (token.length == 1 && token[0] in 'A'..'Z') {
-        return if (shiftActive) token else token.lowercase()
+        return KeyboardBehavior.remapLabel(token, key.id, layerState)
     }
 
     if (token.length == 1 && token[0] in '0'..'9') {
-        return if (shiftActive) SHIFT_DIGIT_MAP[token] ?: original else token
+        return if (layerState.shiftPressed) SHIFT_DIGIT_MAP[token] ?: original else token
     }
 
     val symbolPair = SHIFT_SYMBOL_TOKEN_MAP[token]
     if (symbolPair != null) {
-        return if (shiftActive) symbolPair.second else symbolPair.first
+        return if (layerState.shiftPressed) symbolPair.second else symbolPair.first
     }
 
     return original
@@ -1504,20 +2034,6 @@ private fun glassOutlinedButtonColors() = ButtonDefaults.outlinedButtonColors(
 private fun glassOutlinedBorder() = androidx.compose.foundation.BorderStroke(
     1.dp,
     Color.White.copy(alpha = 0.18f)
-)
-
-@Composable
-private fun glassTextFieldColors() = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = Color.Transparent,
-    unfocusedContainerColor = Color.Transparent,
-    disabledContainerColor = Color.Transparent,
-    focusedBorderColor = Color.White.copy(alpha = 0.30f),
-    unfocusedBorderColor = Color.White.copy(alpha = 0.18f),
-    cursorColor = Color.White,
-    focusedTextColor = Color.White,
-    unfocusedTextColor = Color.White,
-    focusedLabelColor = Color.White.copy(alpha = 0.86f),
-    unfocusedLabelColor = Color.White.copy(alpha = 0.62f)
 )
 
 private fun loadBackgroundMediaUri(context: Context): String? {

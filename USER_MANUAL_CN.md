@@ -50,6 +50,30 @@
 2. 电脑执行：`adb reverse tcp:8765 tcp:8765`
 3. Android 填写：`ws://127.0.0.1:8765`
 
+### 4.3 USB Connect 一键有线模式
+
+前提：
+
+1. Android 平板已经打开 FluxMic App
+2. 平板已开启 `USB 调试`，并已授权这台电脑
+3. USB 数据线已连接
+
+步骤：
+
+1. 打开 `windows_receiver_winui/dist/Receiver_WinUI.exe`
+2. 在 Overview 页面确认：
+   - `Server = Running`
+   - 能看到 `USB Status` / `USB Message`
+3. 点击 `USB Connect`
+4. 等待 Windows 端完成 USB/ADB 编排
+5. Android 会自动切换到 `127.0.0.1:8765` 并自动连接
+
+说明：
+
+- 正常情况下不需要再手动输入 localhost
+- 正常情况下不需要再点击 Android 端的 `Connect`
+- 如果失败，请先检查 `USB Status`、`USB Message` 和 `Server Error`
+
 ## 5. 日常使用
 
 1. 在平板按键面板点击按键，Windows 会执行对应动作（KEY/TEXT/MACRO/MOUSE）

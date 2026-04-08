@@ -33,9 +33,10 @@ class LayoutRepository(private val context: Context) {
         return loadLayoutByAssetName(candidate)
     }
 
-    fun loadDefault(): LayoutConfig {
+    fun loadDefault(layoutMode: KeyboardLayoutMode = KeyboardLayoutMode.LAYOUT_60): LayoutConfig {
         val files = listLayoutAssets()
-        val preferred = files.firstOrNull { it.equals("default.json", ignoreCase = true) }
+        val preferred = files.firstOrNull { it.equals(layoutMode.assetName, ignoreCase = true) }
+            ?: files.firstOrNull { it.equals("default.json", ignoreCase = true) }
             ?: files.firstOrNull()
             ?: error("No layout JSON found under assets/layouts")
         return loadLayoutByAssetName(preferred)
