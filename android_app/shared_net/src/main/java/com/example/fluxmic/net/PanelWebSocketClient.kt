@@ -49,34 +49,32 @@ class PanelWebSocketClient {
     fun connect(url: String) {
         disconnect(1000, "reconnect")
         val request = Request.Builder().url(url).build()
-        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+        val socket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                listener?.onConnected()
+                handleSocketOpened(webSocket)
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                handleTextMessage(text)
+                handleSocketTextMessage(webSocket, text)
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                // Android side currently sends binary audio only.
-                // Keep this callback for future reverse audio/state binary features.
-                Log.d(TAG, "Binary from server ignored: ${bytes.size} bytes")
+                handleSocketBinaryMessage(webSocket, bytes)
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                webSocket.close(code, reason)
-                listener?.onDisconnected("closing($code): $reason")
+                handleSocketClosing(webSocket, code, reason)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                listener?.onDisconnected("closed($code): $reason")
+                handleSocketClosed(webSocket, code, reason)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                listener?.onError(t.message ?: "websocket failure")
+                handleSocketFailure(webSocket, t)
             }
         })
+        webSocket = socket
     }
 
     fun disconnect(code: Int = 1000, reason: String = "manual") {
@@ -90,6 +88,45 @@ class PanelWebSocketClient {
 
     fun sendBinary(data: ByteArray): Boolean {
         return webSocket?.send(ByteString.of(*data)) ?: false
+    }
+
+    internal fun setActiveSocketForTesting(socket: WebSocket?) {
+        webSocket = socket
+    }
+
+    internal fun handleSocketOpened(socket: WebSocket) {
+        if (!isCurrentSocket(socket)) return
+        listener?.onConnected()
+    }
+
+    internal fun handleSocketTextMessage(socket: WebSocket, text: String) {
+        if (!isCurrentSocket(socket)) return
+        handleTextMessage(text)
+    }
+
+    internal fun handleSocketBinaryMessage(socket: WebSocket, bytes: ByteString) {
+        if (!isCurrentSocket(socket)) return
+        // Android side currently sends binary audio only.
+        // Keep this callback for future reverse audio/state binary features.
+        Log.d(TAG, "Binary from server ignored: ${bytes.size} bytes")
+    }
+
+    internal fun handleSocketClosing(socket: WebSocket, code: Int, reason: String) {
+        if (!isCurrentSocket(socket)) return
+        socket.close(code, reason)
+        listener?.onDisconnected("closing($code): $reason")
+    }
+
+    internal fun handleSocketClosed(socket: WebSocket, code: Int, reason: String) {
+        if (!isCurrentSocket(socket)) return
+        webSocket = null
+        listener?.onDisconnected("closed($code): $reason")
+    }
+
+    internal fun handleSocketFailure(socket: WebSocket, throwable: Throwable) {
+        if (!isCurrentSocket(socket)) return
+        webSocket = null
+        listener?.onError(throwable.message ?: "websocket failure")
     }
 
     private fun handleTextMessage(text: String) {
@@ -128,5 +165,9 @@ class PanelWebSocketClient {
 
     companion object {
         private const val TAG = "PanelWebSocketClient"
+    }
+
+    private fun isCurrentSocket(socket: WebSocket): Boolean {
+        return webSocket === socket
     }
 }

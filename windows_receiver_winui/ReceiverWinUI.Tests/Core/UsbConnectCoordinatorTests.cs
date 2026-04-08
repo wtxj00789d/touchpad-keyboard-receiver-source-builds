@@ -153,7 +153,7 @@ public sealed class UsbConnectCoordinatorTests
     }
 
     [Fact]
-    public async Task ConnectAsync_UsesFixedAndroidCommandPort_WhenCallerSuppliesDifferentPort()
+    public async Task ConnectAsync_UsesRequestedAndroidCommandPort_WhenCallerSuppliesDifferentPort()
     {
         var calls = new List<string>();
         var coordinator = CreateCoordinator((_, arguments) =>
@@ -163,7 +163,7 @@ public sealed class UsbConnectCoordinatorTests
             {
                 "devices" => new ProcessRunResult(0, "List of devices attached\r\nemulator-5554\tdevice\r\n", string.Empty),
                 "reverse tcp:9000 tcp:9000" => new ProcessRunResult(0, "ok", string.Empty),
-                "shell am start -a com.example.fluxmic.action.USB_CONNECT --es host 127.0.0.1 --ei port 8765" =>
+                "shell am start -a com.example.fluxmic.action.USB_CONNECT --es host 127.0.0.1 --ei port 9000" =>
                     new ProcessRunResult(0, "ok", string.Empty),
                 _ => throw new InvalidOperationException($"unexpected command: {arguments}")
             };
@@ -173,9 +173,6 @@ public sealed class UsbConnectCoordinatorTests
 
         Assert.Equal(UsbConnectState.Ready, result.State);
         Assert.Contains(
-            "shell am start -a com.example.fluxmic.action.USB_CONNECT --es host 127.0.0.1 --ei port 8765",
-            calls);
-        Assert.DoesNotContain(
             "shell am start -a com.example.fluxmic.action.USB_CONNECT --es host 127.0.0.1 --ei port 9000",
             calls);
     }

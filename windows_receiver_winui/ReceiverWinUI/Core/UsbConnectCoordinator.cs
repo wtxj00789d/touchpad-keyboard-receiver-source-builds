@@ -79,9 +79,8 @@ public sealed class UsbConnectCoordinator
                 null);
         }
 
-        const int AndroidCommandPort = 8765;
         var androidCommandArguments =
-            $"shell am start -a com.example.fluxmic.action.USB_CONNECT --es host 127.0.0.1 --ei port {AndroidCommandPort}";
+            $"shell am start -a com.example.fluxmic.action.USB_CONNECT --es host 127.0.0.1 --ei port {port}";
         var androidCommandResult = await _runProcessAsync(
             adbExecutablePath,
             androidCommandArguments,
