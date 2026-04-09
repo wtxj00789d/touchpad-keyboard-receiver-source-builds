@@ -18,7 +18,7 @@
 离线包放置路径：
 
 - `assets/vbcable/VBCABLE_Setup_x64.exe`
-- 或 `assets/vbcable/VBCABLE_Driver_Pack*.zip`
+- `assets/vbcable/VBCABLE_Driver_Pack*.zip`
 
 ## 3. 直接使用（不改代码）
 
@@ -38,6 +38,7 @@
 3. 在顶部输入连接地址并点击 Connect
 
 ## 4. 连接方式
+
 ### 4.1 Wi-Fi 模式
 
 1. 在 Windows 查看本机 IP（如 `192.168.1.10`）
@@ -118,20 +119,14 @@
 2. 减少网络抖动源
 3. 降低 jitter 目标值（默认 60ms）
 
-### 8.3 按键不生效
+### 8.3 动作没有触发
 
-1. Receiver 的 Actions 是否开启
-2. 目标程序是否需要管理员权限
-3. 若目标程序是管理员权限，Receiver 也请用管理员权限运行
+1. Windows 端 `Actions` 是否开启
+2. 当前布局里的 key 是否配置了合法 `action`
+3. Windows 是否拦截了目标快捷键（例如某些系统级组合键）
 
-### 8.4 驱动安装失败
+## 9. 当前已知限制
 
-1. 确认离线安装包路径正确
-2. 手动右键管理员运行 `VBCABLE_Setup_x64.exe`
-3. 安装后重启 Receiver
-
-## 9. 安全建议
-
-1. 只在可信局域网内使用
-2. 不使用时关闭 Receiver 或禁用 Actions
-3. 生产发布请替换默认签名证书与密码
+1. 当前 USB 一键连接仍依赖 `ADB reverse`
+2. Opus 音频编码仍未接入，当前以 PCM 链路为主
+3. 虚拟麦克风仍依赖 VB-CABLE 或等价方案
