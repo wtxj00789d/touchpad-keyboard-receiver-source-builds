@@ -1,8 +1,8 @@
 # FluxMic
 
-FluxMic is a simple idea with a very specific goal: let an Android tablet sit on a desk and feel useful as a real keyboard, not just a second screen full of buttons.
+FluxMic is about one very particular idea: turning an Android tablet into something that can actually live on your desk as a keyboard, not just as a spare screen with controls on it.
 
-The tablet is the main surface. Windows is the host side. The Receiver keeps the connection alive, executes actions, reports window state back to the tablet, and preserves the retained audio path from the current alpha implementation.
+The keyboard is the center. The upper half of the screen is there to support it with context, status, and a few useful controls. The Windows Receiver sits quietly on the other side and makes the whole setup work.
 
 - Chinese version: [README_CN.md](README_CN.md)
 - Chinese user manual: [USER_MANUAL_CN.md](USER_MANUAL_CN.md)
@@ -10,30 +10,70 @@ The tablet is the main surface. Windows is the host side. The Receiver keeps the
 
 ## What FluxMic Is
 
-FluxMic is centered on a tablet-first glass keyboard experience for Windows desks.
+FluxMic is a tablet-first glass keyboard experience for Windows desks.
 
-That means:
+It is built around a few simple priorities:
 
-- Android tablet first, not a Windows-first control panel
-- typing comes before everything else
-- the overlay exists to support the keyboard, not to compete with it
-- the Windows Receiver is the bridge host, not the star of the show
+- typing comes first
+- the tablet should feel like a real desk companion, not a novelty panel
+- the background is part of the experience, not an afterthought
+- the overlay should add useful context without taking over the screen
+- the Windows Receiver is the bridge host, not the main stage
 
-Touchpad is still in the repository and still part of the family, but it is not the main story of the current bundle.
+Touchpad is still part of the repository and still part of the broader family, but it is not the lead story of the current bundle.
 
-## What It Can Do
+## Core Features
 
-- Run a 60% or 68-key keyboard layout on an Android tablet
-- Show `Fn`, `Caps`, and `Shift` state directly on the keycaps
-- Add a lightweight overlay for connection state, active window info, window controls, mute, and volume
-- Use custom image or video backgrounds
-- Connect over Wi-Fi or through one-click USB Connect
-- Send keyboard and control actions through the Windows Receiver
-- Keep the microphone path from the current alpha implementation available
+### A keyboard you can make your own
+
+FluxMic supports custom image and video backgrounds, and that is a core feature, not just decoration. The point is not to make the keyboard flashy for a minute. The point is to let the tablet feel like it belongs on your desk and matches the space around it.
+
+### An overlay that earns its space
+
+The overlay is also a core part of the product. It fills the natural empty area above the keyboard with the things you actually want nearby:
+
+- connection state
+- current window information
+- window actions
+- mute
+- volume
+
+It is meant to feel present and useful, not crowded and control-panel-like.
+
+### A tablet-first keyboard flow
+
+- 60% and 68-key layouts
+- visible `Fn`, `Caps`, and `Shift` state on the keycaps
+- a glass keyboard layout designed to stay on screen and stay useful
+
+### Two practical connection paths
+
+- Wi-Fi mode for the normal local-network setup
+- one-click USB Connect for the current wired workflow
+
+### Windows-side bridge
+
+The Windows Receiver handles:
+
+- the WebSocket host
+- action execution
+- active-window feedback
+- window actions
+- the retained microphone path from the current alpha implementation
+
+## A Couple Of Real Use Stories
+
+### Desk typing, not desk fiddling
+
+You drop the tablet in front of your monitor in the morning, open FluxMic, and leave it there. The background is your own image or video. The bottom half is your keyboard. The top half quietly shows whether you are connected, what window is active, and gives you just enough control to minimize, maximize, mute, or adjust volume without breaking your typing rhythm.
+
+### A keyboard that stays out of your way
+
+FluxMic is not trying to turn every inch of the screen into a button. Most of the time, it just sits there like a keyboard should. When you look up, the overlay tells you what is going on. When you need a quick action, it is already there. Then you go back to typing.
 
 ## How The Pieces Fit Together
 
-### On the Android side
+### Android tablet app
 
 The Android app is the main keyboard surface.
 
@@ -45,7 +85,7 @@ It owns:
 - background customization
 - the optional retained mic path
 
-### On the Windows side
+### Windows Receiver
 
 The Windows Receiver is the host bridge.
 
@@ -58,14 +98,38 @@ It handles:
 - audio receive/output
 - USB Connect orchestration
 
-### Connection modes
+## Connection Modes
 
-There are two practical ways to connect:
+### Wi-Fi mode
 
-- Wi-Fi mode, for the normal local-network path
-- USB mode, for the current ADB-based wired flow
+This is the straightforward local-network path.
 
-Important: the current USB mode is not a native non-debug USB transport. It works through `ADB reverse`, so Android USB debugging must be enabled and the tablet must trust the current PC.
+1. Find the PC IP address, for example `192.168.1.10`
+2. Make sure `8765/TCP` is available
+3. Connect from Android to `ws://192.168.1.10:8765`
+
+### USB Connect mode
+
+USB Connect is convenient, but it is still based on `ADB reverse`.
+
+Requirements:
+
+1. The Android app is already open
+2. The USB cable supports data transfer
+3. Android `USB debugging` is enabled
+4. The tablet has already trusted the current PC for USB debugging
+
+Flow:
+
+1. Open the Windows Receiver
+2. Confirm `Server = Running`
+3. Click `USB Connect`
+4. The Receiver handles the USB / ADB orchestration
+5. Android switches to `127.0.0.1:8765` and connects automatically
+
+So yes: if USB debugging is off, or the tablet has not trusted the current PC, USB Connect will not work.
+
+Important: this is not a native non-debug USB transport.
 
 ## Repository Layout
 
@@ -104,44 +168,11 @@ Run:
 
 - `Receiver_WinUI.exe`
 
-If the Receiver is not up, the tablet has nothing to talk to.
-
 ### 4. Open the Android app
 
 Install the keyboard app on the tablet and open it.
 
 The intended default flow is that the Android app is already open before you use USB Connect.
-
-## Connection Modes
-
-### Wi-Fi mode
-
-This is the straightforward network path.
-
-1. Find the PC IP address, for example `192.168.1.10`
-2. Make sure `8765/TCP` is available
-3. Connect from Android to `ws://192.168.1.10:8765`
-
-### USB Connect mode
-
-USB Connect currently rides on top of `ADB reverse`.
-
-Requirements:
-
-1. The Android app is already open
-2. The USB cable supports data transfer
-3. Android `USB debugging` is enabled
-4. The tablet has already trusted the current PC for USB debugging
-
-Flow:
-
-1. Open the Windows Receiver
-2. Confirm `Server = Running`
-3. Click `USB Connect`
-4. The Receiver handles the USB / ADB orchestration
-5. Android switches to `127.0.0.1:8765` and connects automatically
-
-So yes: if USB debugging is off, or the tablet has not trusted the current PC, USB Connect will not work.
 
 ## Build From Source
 
