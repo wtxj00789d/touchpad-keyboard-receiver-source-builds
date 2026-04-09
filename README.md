@@ -1,164 +1,156 @@
-﻿# FluxMic Panel (Android) + Windows Receiver
+# FluxMic
 
-把 Android 平板变成“Flux 风格键盘面板 + 无线麦克风 / 触摸板”，通过 WebSocket 把音频和动作发到 Windows 11，并在 Windows 端注入到虚拟麦克风设备。
+Turn an Android tablet into a tablet-first glass keyboard for a Windows desk.
 
-## 目录结构
+FluxMic is built around a simple idea: the Android tablet is the primary typing surface, and the Windows Receiver is the host bridge that makes the keyboard, overlay controls, and retained audio path work on the PC side.
 
-- `android_app/` Android Studio 工程（`:app` 键盘+麦克风、`:touchpad` 触摸板、`:shared_net` 共享网络层）
-- `windows_receiver/` Windows 接收端源码（Python + Tkinter，旧版）
-- `windows_receiver_winui/` Windows 接收端源码（WPF/.NET 8，推荐）
-- `protocol.md` 音频帧与 JSON 消息协议
-- `USER_MANUAL_CN.md` 最终用户使用说明书（中文）
-- `samples/layouts/` 键盘布局 JSON 示例
-- `assets/vbcable/` 虚拟音频驱动离线安装包放置目录
-- `build/` 一键构建脚本
+- Chinese version: [README_CN.md](README_CN.md)
+- User manual (Chinese): [USER_MANUAL_CN.md](USER_MANUAL_CN.md)
+- Protocol reference: [protocol.md](protocol.md)
 
-## 当前实现状态
+## What It Is
 
-### 已实现（可运行）
+FluxMic is not positioned as a generic remote-control dashboard. Its primary product story is:
 
-1. Android 全屏键盘面板（JSON 布局、多页 Tab、按压高亮、ripple、长按、滑动选键、防误触）
-2. Android 麦克风采集（48k/mono/16bit，20ms 帧）并通过 WebSocket 二进制帧发送（PCM）
-3. Android Touchpad 独立 APK（单指移动、双指滚动、左右键、双击、按住拖拽）
-4. Android 与 Windows 通过同一 WebSocket 连接传输：
-   - binary: audio frame
-   - text json: action/control/state/ping
-5. Windows WebSocket Server（默认 `0.0.0.0:8765`，支持多客户端并发）
-6. Windows 音频接收 + jitter buffer（默认 60ms）+ 输出设备可选
-7. Windows 动作执行（KEY/TEXT/MACRO/MOUSE，含触摸板相对移动/滚轮/按键）
-8. Windows UI：连接状态、RTT/抖动、驱动状态、输出设备选择、启停、动作开关、最近日志
-9. 启动时自动检测 VB-CABLE；缺失时弹窗并可一键安装（UAC 提权）
+- a glass keyboard experience for Android tablets
+- a desk-ready primary typing surface with 60% and 68-key layouts
+- a lightweight overlay for status, window controls, and limited system controls
+- a Windows host bridge for keyboard, window, audio, and transport features
 
-### 编解码说明
+Touchpad remains part of the repository and product family, but it is not the lead story of the current homepage or release bundle.
 
-- 已实现：`PCM16`（codec=0）
-- 预留接口：`OPUS`（codec=1）
-- 如需启用 Opus，可在后续阶段接入本地 Opus 库（建议离线放入仓库，避免在线拉取）
+## Core Capabilities
 
-## 快速开始
+- Tablet-first glass keyboard experience with 60% and 68-key layouts
+- Visible `Fn`, `Caps`, and `Shift` layer mapping on the keycaps
+- Overlay for connection state, active window information, window actions, mute, and volume
+- Custom background image and video support
+- Wi-Fi mode and one-click USB Connect mode
+- Windows Receiver with keyboard/action execution and retained microphone path from the current alpha implementation
 
-### 1) Windows Receiver（Python 旧版）
+## System Overview
 
-1. 进入 `windows_receiver/`
-2. 安装依赖：
-   - `py -3.11 -m venv .venv`
-   - `.\.venv\Scripts\Activate.ps1`
-   - `pip install -r requirements.txt`
-3. 运行：`python -m receiver.main`
+### Android tablet app
 
-### 1b) Windows Receiver（WinUI/WPF 推荐）
+- Primary keyboard surface
+- Overlay UI and background customization
+- Keyboard input, layout switching, and layer states
+- Optional retained microphone path from the current alpha implementation
 
-1. 进入 `windows_receiver_winui/ReceiverWinUI/`
-2. 运行：`dotnet run -c Release`
+### Windows Receiver
 
-打包：
+- WebSocket host
+- Action execution bridge
+- Window-state feedback and window actions
+- Audio receive/output path
+- USB Connect orchestration
 
-- `build/build_windows_winui.ps1`
-- 产物：`windows_receiver_winui/dist/Receiver_WinUI.exe`
-- 不会覆盖旧版：`windows_receiver/dist/Receiver.exe`
+### Connection modes
 
-首次启动会检测 VB-CABLE：
-- 若已安装：继续运行
-- 若未安装：提示安装。程序会在 `assets/vbcable/` 中查找离线安装包（见下文）
+- Wi-Fi mode: connect to the PC IP and port over the local network
+- USB mode: uses `ADB reverse` to map the Windows Receiver to `127.0.0.1:8765` on Android
 
-### 2) Android App
+Important: the current USB mode is not a native non-debug USB transport. It depends on Android USB debugging and trusting the current PC.
 
-1. Android Studio 打开 `android_app/`
-2. 使用 JDK 17 或 JDK 21 同步 Gradle
-3. 键盘+麦克风 APK：安装 `:app` 模块（首次运行授权麦克风）
-4. 触摸板 APK：安装 `:touchpad` 模块（无麦克风权限）
-5. 在两个 App 中都填入同一 Receiver WebSocket 地址后连接
+## Repository Layout
 
-说明：仓库已包含 `gradle-wrapper.jar`，可直接使用 `android_app/gradlew`。
+- `android_app/`: Android Studio project for the keyboard app, touchpad app, and shared network module
+- `windows_receiver_winui/`: recommended Windows Receiver implementation
+- `windows_receiver/`: legacy Python receiver
+- `build/`: build and packaging scripts
+- `assets/`: shared assets, including driver-related folders when present
+- `samples/`: sample layouts and related references
 
-### 3) 连接模式
+## Quick Start
 
-#### Wi-Fi 模式
+### 1. Download the release assets
 
-1. 在 PC 查 IP（例如 `192.168.1.10`）
-2. Windows 放行 `8765/TCP`
-3. Android 连接：`ws://192.168.1.10:8765`
+Use the latest prerelease bundle from GitHub:
 
-#### ADB reverse 模式
+- Android APK: `app-release-signed-keyboard.apk`
+- Windows Receiver: `Receiver_WinUI-win-x64.zip`
+- Release page: [GitHub Releases](https://github.com/wtxj00789d/touchpad-keyboard-receiver-source-builds/releases)
 
-1. `adb devices`
-2. `adb reverse tcp:8765 tcp:8765`
-3. Android 连接：`ws://127.0.0.1:8765`
+### 2. Prepare Windows
 
-#### USB Connect（一键有线模式）
+Extract the WinUI zip and keep the folder structure intact.
 
-前提：
+The current WinUI release zip is the lightweight `framework-dependent` build. Target machines should have:
 
-1. Android 平板已打开 FluxMic App
-2. 平板已开启 `USB 调试`，并且已经授权当前电脑
-3. USB 数据线已连接
+- `.NET 8 Desktop Runtime (x64)`
+- `Windows App Runtime / Windows App SDK Runtime 1.8 (x64)`
 
-步骤：
+If you need a fully bundled package for a clean Windows machine, use a self-contained build instead of the default release asset.
 
-1. 打开 `windows_receiver_winui/dist/Receiver_WinUI.exe`
-2. 确认 Overview 页里的 `Server = Running`
-3. 点击 `USB Connect`
-4. Receiver 会自动执行 USB/ADB 编排
-5. Android 会自动切到 `127.0.0.1:8765` 并发起连接，无需再手输地址或再点 Connect
+### 3. Start the Windows Receiver
 
-## VB-CABLE 离线包放置（许可与替代方案）
+Run:
 
-由于驱动分发许可可能变化，仓库默认不内置安装器二进制。请手动放置离线包到：
+- `Receiver_WinUI.exe`
 
-- `assets/vbcable/VBCABLE_Setup_x64.exe`
+Confirm that the Receiver is running before connecting from Android.
 
-可选也支持：
+### 4. Open the Android app
 
-- `assets/vbcable/VBCABLE_Driver_Pack*.zip`（程序会自动解压并查找 x64 安装器）
+Install and open the keyboard app on the tablet. The intended default scenario is that the Android app is already open before using USB Connect.
 
-如果缺失，Receiver 会明确弹窗提示并引导手动放置。
+## Connection Modes
 
-## Windows 声音设置
+### Wi-Fi mode
 
-- Receiver 输出设备选 `CABLE Input (VB-Audio Virtual Cable)`
-- 其它软件把麦克风选为 `CABLE Output (VB-Audio Virtual Cable)`
+1. Find the Windows PC IP address, for example `192.168.1.10`
+2. Make sure port `8765/TCP` is allowed
+3. Connect from Android to `ws://192.168.1.10:8765`
 
-## 常见问题
+### USB Connect mode
 
-1. 无声
-- 检查 Android 是否已连接且麦克风未静音
-- 检查 Receiver 输出设备是否选到 `CABLE Input`
-- 检查目标软件是否选了 `CABLE Output` 作为麦克风
+USB Connect is currently implemented through `ADB reverse`.
 
-2. 延迟高
-- 降低 jitter buffer（例如 60ms -> 40ms）
-- 确认局域网信号稳定，尽量 5GHz Wi-Fi
+Requirements:
 
-3. 回声
-- 禁止系统同时监听 CABLE Output
-- 避免扬声器外放被平板再次采集
+1. The Android app is already open
+2. The USB cable is physically connected and supports data transfer
+3. Android `USB debugging` is enabled
+4. The tablet has already trusted the current PC for USB debugging
 
-4. 动作不执行
-- Receiver 中确认 `Actions: Enabled`
-- 某些目标程序需要管理员权限，Receiver 也需管理员运行
+Flow:
 
-5. 安装驱动失败
-- 手动运行 `VBCABLE_Setup_x64.exe`（管理员）
-- 安装后重启 Receiver 并刷新设备列表
+1. Open the Windows Receiver
+2. Confirm `Server = Running`
+3. Click `USB Connect`
+4. The Receiver runs the USB/ADB orchestration
+5. Android switches to `127.0.0.1:8765` and automatically connects
 
-## 打包
+Because this flow depends on ADB, USB mode will not work unless USB debugging is enabled and the current PC is trusted by the tablet.
 
-- Windows（Python 旧版）: `build/build_windows.ps1` 或 `build/build_windows.bat`
-- Windows（WinUI/WPF）: `build/build_windows_winui.ps1` 或 `build/build_windows_winui.bat`
-- Android: `build/build_android.ps1` 或 `build/build_android.bat`
-  - Keyboard Debug: `build\\build_android.ps1 -BuildType Debug -Module app`
-  - Keyboard Release: `build\\build_android.ps1 -BuildType Release -Module app`
-  - Touchpad Debug: `build\\build_android.ps1 -BuildType Debug -Module touchpad`
-  - Touchpad Release: `build\\build_android.ps1 -BuildType Release -Module touchpad`
-  - 说明文档：`build/build_android.md`
+## Build From Source
 
-### Android 已签名 Release APK
+### Windows Receiver (WinUI, recommended)
 
-- `build\\sign_android_release.ps1`
-- 输出：`android_app\\app\\build\\outputs\\apk\\release\\app-release-signed.apk`
+- PowerShell: `E:\work\repo\build\build_windows_winui.ps1`
+- PowerShell self-contained build: `E:\work\repo\build\build_windows_winui.ps1 -SelfContained`
+- Batch: `E:\work\repo\build\build_windows_winui.bat`
 
-## 安全提示
+Default output:
 
-- 默认会处理所有已连接客户端发送的动作
-- 提供动作执行总开关，必要时可随时暂停
-- 建议只在可信局域网使用
+- `windows_receiver_winui/dist/`
+
+Self-contained output:
+
+- `windows_receiver_winui/dist-self-contained/`
+
+### Android app
+
+- Debug keyboard app: `E:\work\repo\build\build_android.ps1 -BuildType Debug -Module app`
+- Release keyboard app: `E:\work\repo\build\build_android.ps1 -BuildType Release -Module app`
+- Signed release APK: `E:\work\repo\build\sign_android_release.ps1 -Module app`
+
+### Legacy Python receiver
+
+The legacy receiver is still present in `windows_receiver/`, but the WinUI Receiver is the recommended Windows host.
+
+## Notes
+
+- Touchpad remains in the repository as a family extension, but it is not the main release story here
+- The retained microphone path is still part of the system, following the current alpha implementation
+- Actions should be used in trusted environments only
