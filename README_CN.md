@@ -1,158 +1,213 @@
 # FluxMic
 
-FluxMic 鎯冲仛鐨勪簨鎯呭叾瀹炲緢鍏蜂綋锛氳涓€鍙?Android 骞虫澘鎽嗗湪妗屼笂鏃讹紝涓嶅彧鏄€滄梺杈归偅鍧楀甫鐐规寜閽殑灞忓箷鈥濓紝鑰屾槸鐪熺殑鑳藉儚涓€鎶婇敭鐩橀偅鏍烽暱鏈熷瓨鍦ㄣ€?
-閿洏鏄腑蹇冦€傚睆骞曚笂鍗婇儴鍒嗕笉鏄负浜嗗爢鍔熻兘锛岃€屾槸涓轰簡缁欓敭鐩樿ˉ涓婄姸鎬併€佷笂涓嬫枃鍜屽皯閲忕湡姝ｉ『鎵嬬殑鎺у埗銆俉indows Receiver 鍒欏畨闈欏湴寰呭湪鍙︿竴杈癸紝鎶婃暣濂椾綋楠屾帴璧锋潵銆?
-- 鑻辨枃涓婚〉: [README.md](README.md)
-- 涓枃鐢ㄦ埛鎵嬪唽: [USER_MANUAL_CN.md](USER_MANUAL_CN.md)
-- 鍗忚璇存槑: [protocol.md](protocol.md)
+FluxMic 想做的事情其实很具体：让一台 Android 平板摆在桌上时，不只是“旁边那块带点按钮的屏幕”，而是真的能像一把键盘那样长期存在。
 
-## FluxMic 鏄粈涔?
-FluxMic 鐨勬牳蹇冩槸鈥滃钩鏉夸紭鍏堢殑鐜荤拑鍖栭敭鐩樹綋楠屸€濄€?
-瀹冭儗鍚庣殑浼樺厛绾у緢绠€鍗曪細
+键盘是中心。屏幕上半部分不是为了堆功能，而是为了给键盘补上状态、上下文和少量真正顺手的控制。Windows Receiver 则安静地待在另一边，把整套体验接起来。
 
-- 鍏堟妸鎵撳瓧杩欎欢浜嬪仛濂?- 璁╁钩鏉跨湅璧锋潵鍍忔闈紮浼达紝鑰屼笉鏄櫛澶存帶鍒舵澘
-- 鑳屾櫙涓嶆槸闄勮禒瑁呴グ锛岃€屾槸浣撻獙鐨勪竴閮ㄥ垎
-- Overlay 瑕佹湁鐢紝浣嗕笉鑳芥姠鎴?- Windows Receiver 鏄ˉ鎺ュ涓伙紝涓嶆槸浜у搧涓昏
+- 英文主页：[README.md](README.md)
+- 中文用户手册：[USER_MANUAL_CN.md](USER_MANUAL_CN.md)
+- 协议说明：[protocol.md](protocol.md)
 
-Touchpad 杩樺湪浠撳簱閲岋紝涔熻繕鏄悓涓€瀹舵棌鐨勪竴閮ㄥ垎锛屽彧鏄畠涓嶆槸褰撳墠杩欎釜 bundle 鐨勪富鍙欎簨銆?
-## 鏍稿績鍔熻兘鐐?
-### 鍙互鐪熸鈥滃彉鎴愪綘鐨勬闈⑩€濈殑閿洏
+## FluxMic 是什么
 
-FluxMic 鏀寔鑷畾涔夊浘鐗囧拰瑙嗛鑳屾櫙锛岃€屼笖杩欎笉鏄竴涓竟瑙掑姛鑳姐€傚畠鐨勬剰涔変笉鏄负浜嗚閿洏鐭殏鍦扳€滆姳鍝ㄤ竴涓嬧€濓紝鑰屾槸涓轰簡璁╄繖鍧楀钩鏉跨湡鐨勬洿鍍忎綘妗岄潰鐨勪竴閮ㄥ垎锛岀湅璧锋潵鏄綘鎰挎剰涓€鐩存憜鍦ㄩ偅閲岀殑涓滆タ銆?
-### 鍊煎緱鍗犳嵁涓婂崐鍖虹殑 Overlay
+FluxMic 的核心是“平板优先的玻璃化键盘体验”。
 
-Overlay 涔熸槸鏍稿績鍔熻兘鐐广€傚畠瀛樺湪鐨勬剰涔夛紝灏辨槸鎶婇敭鐩樹笂鏂瑰ぉ鐒朵細绌哄嚭鏉ョ殑鍖哄煙锛屽彉鎴愮湡姝ｆ湁鐢ㄤ絾涓嶈繃搴︾殑閮ㄥ垎銆?
-瀹冧細鎶婅繖浜涗笢瑗胯嚜鐒跺湴鏀惧湪浣犺绾块檮杩戯細
+它背后的优先级很简单：
 
-- 杩炴帴鐘舵€?- 褰撳墠绐楀彛淇℃伅
-- 绐楀彛鎿嶄綔
-- 闈欓煶
-- 闊抽噺
+- 打字优先
+- 平板应该像桌面伙伴，而不是新奇控制板
+- 背景是体验的一部分，不是附带装饰
+- Overlay 要提供有用信息，但不能抢主角
+- Windows Receiver 是桥接宿主，不是产品舞台
 
-瀹冨簲璇ヨ浣犺寰楅『鎵嬶紝鑰屼笉鏄浣犺寰楀儚鎵撳紑浜嗕竴涓帶鍒跺彴銆?
-### 骞虫澘浼樺厛鐨勯敭鐩樹富娴佺▼
+`touchpad` 仍然在仓库里，也仍然属于这个产品家族的一部分，只是它不是当前这个 bundle 的主叙事。
 
-- 60% 鍜?68 閿竷灞€
-- `Fn`銆乣Caps`銆乣Shift` 鐘舵€佺洿鎺ヤ綋鐜板湪閿附涓?- 涓€濂楅€傚悎闀挎湡鏀惧湪灞忓箷涓婄殑鐜荤拑鍖栭敭鐩樺竷灞€
+## 核心功能
 
-### 涓ゆ潯瀹炵敤鐨勮繛鎺ヨ矾寰?
-- Wi-Fi 妯″紡锛岃蛋甯歌灞€鍩熺綉杩炴帴
-- 涓€閿?`USB Connect`锛岃蛋褰撳墠杩欏鏈夌嚎娴佺▼
+### 一块真正能变成你的桌面一部分的键盘
 
-### Windows 渚фˉ鎺ヨ兘鍔?
-Windows Receiver 璐熻矗锛?
-- WebSocket 瀹夸富
-- 鍔ㄤ綔鎵ц
-- 褰撳墠绐楀彛鐘舵€佸洖浼?- 绐楀彛鎿嶄綔
-- 娌跨敤褰撳墠 Alpha 瀹炵幇鐨勯害鍏嬮閾捐矾
+FluxMic 支持自定义图片和视频背景，而且这不是边角功能。重点不是让键盘短暂地“花一点”，而是让这块平板更像你桌面的一部分，看起来就是愿意一直摆在那里的东西。
 
-## 涓や釜鏇村儚鐪熷疄浣跨敤鐨勫満鏅?
-### 妗岄潰涓诲姏鎵撳瓧锛岃€屼笉鏄闈㈡姌鑵?
-鏃╀笂鎶婂钩鏉挎斁鍒版樉绀哄櫒鍓嶏紝鎵撳紑 FluxMic锛岀劧鍚庡氨璁╁畠寰呭湪閭ｉ噷銆傝儗鏅槸浣犺嚜宸遍€夌殑鍥炬垨瑙嗛锛屼笅鍗婇儴鍒嗘槸閿洏锛屼笂鍗婇儴鍒嗗畨闈欏湴鍛婅瘔浣犵幇鍦ㄦ湁娌℃湁杩炰笂銆佸綋鍓嶆槸浠€涔堢獥鍙ｏ紝涔熻浣犻『鎵嬪仛鏈€灏忓寲銆佹渶澶у寲銆侀潤闊炽€佽皟闊抽噺杩欎簺灏忓姩浣滐紝涓嶇敤鑰佹槸鎶婅妭濂忔墦鏂€?
-### 涓€鍧椾笉浼氳€佹兂鐫€鎶綘娉ㄦ剰鍔涚殑閿洏
+### 一层值得占据上半区的 Overlay
 
-FluxMic 涓嶆槸鎯虫妸灞忓箷姣忎竴瀵搁兘鍋氭垚鎸夐挳銆傚ぇ澶氭暟鏃跺€欙紝瀹冨氨鍍忎竴鎶婇敭鐩樿鏈夌殑鏍峰瓙寰呭湪閭ｉ噷銆備綘鎶溂鐨勬椂鍊欙紝Overlay 鍒氬ソ鎶婇渶瑕佺殑涓滆タ鏀惧湪涓婇潰锛涗綘闇€瑕佽交鎺у埗鐨勬椂鍊欙紝瀹冧篃宸茬粡鍦ㄩ偅閲岋紱鐒跺悗浣犵户缁墦瀛椼€?
-## 杩欏涓滆タ鎬庝箞鎷煎湪涓€璧?
-### Android 骞虫澘 App
+Overlay 也是核心功能点。它把键盘上方天然会空出来的区域，变成真正有用但不过度的部分。
 
-Android App 灏辨槸涓婚敭鐩橀潰銆?
-瀹冭礋璐ｏ細
+你会在这里看到：
 
-- 閿洏甯冨眬
-- 灞傜姸鎬佸拰鍙鏄犲皠
+- 连接状态
+- 当前窗口信息
+- 窗口操作
+- 静音
+- 音量
+
+它应该让你觉得顺手，而不是像打开了一个控制台。
+
+### 为平板而生的键盘主流程
+
+- 60% 和 68 键布局
+- `Fn`、`Caps`、`Shift` 状态直接体现在键帽上
+- 一套适合长期停留在屏幕上的玻璃键盘布局
+
+### 两条实用的连接路径
+
+- Wi-Fi 模式，用于常规局域网连接
+- 一键 `USB Connect`，用于当前有线工作流
+
+### Windows 侧桥接能力
+
+Windows Receiver 负责：
+
+- WebSocket 宿主
+- 动作执行
+- 当前窗口状态回传
+- 窗口操作
+- 沿用当前 Alpha 方案的麦克风链路
+
+## 两个更接近日常办公的使用故事
+
+### 桌面主力打字，而不是桌面折腾
+
+早上把平板放到显示器前，打开 FluxMic，然后就让它待在那里。背景是你自己的图片或视频，下半部分是键盘，上半部分安静地告诉你有没有连上、当前是什么窗口，也让你顺手做最小化、最大化、静音、调音量这些小动作，不用老是把节奏打断。
+
+### 一块不会老想抢你注意力的键盘
+
+FluxMic 不是想把屏幕每一寸都做成按钮。大多数时候，它就像一把键盘该有的样子待在那里。你抬眼的时候，Overlay 刚好把需要的东西放在上面；你需要轻控制的时候，它也已经在那里；然后你继续打字。
+
+## 这套东西怎么拼在一起
+
+### Android 平板 App
+
+Android App 就是主键盘面。
+
+它负责：
+
+- 键盘布局
+- 层状态和可视映射
 - Overlay
-- 鑳屾櫙鑷畾涔?- 鍙€変繚鐣欑殑楹﹀厠椋庨摼璺?
+- 背景自定义
+- 可选保留的麦克风链路
+
 ### Windows Receiver
 
-Windows Receiver 鏄ˉ鎺ュ涓汇€?
-瀹冭礋璐ｏ細
+Windows Receiver 是桥接宿主。
+
+它负责：
 
 - WebSocket server
-- 鍔ㄤ綔鎵ц
-- 褰撳墠绐楀彛鐘舵€佸洖浼?- 绐楀彛鎿嶄綔
-- 闊抽鎺ユ敹涓庤緭鍑?- `USB Connect` 缂栨帓
+- 动作执行
+- 当前窗口状态回传
+- 窗口操作
+- 音频接收与输出
+- `USB Connect` 编排
 
-## 杩炴帴妯″紡
+## 连接模式
 
-### Wi-Fi 妯″紡
+### Wi-Fi 模式
 
-杩欐槸鏈€鐩存帴鐨勫眬鍩熺綉杩炴帴鏂瑰紡銆?
-1. 鎵惧埌 PC 鐨?IP锛屾瘮濡?`192.168.1.10`
-2. 纭繚 `8765/TCP` 鍙敤
-3. 鍦?Android 绔繛鎺?`ws://192.168.1.10:8765`
+这是最直接的局域网连接方式。
 
-### USB Connect 妯″紡
+1. 找到 PC 的 IP，例如 `192.168.1.10`
+2. 确认 `8765/TCP` 可用
+3. Android 连接到 `ws://192.168.1.10:8765`
 
-`USB Connect` 鐢ㄨ捣鏉ユ柟渚匡紝浣嗗畠鏈川涓婁粛鐒惰窇鍦?`ADB reverse` 涔嬩笂銆?
-鍓嶆彁鏉′欢锛?
-1. Android App 宸茬粡鎵撳紑
-2. USB 绾挎敮鎸佹暟鎹紶杈?3. Android 宸插紑鍚?`USB 璋冭瘯`
-4. 骞虫澘宸茬粡瀵瑰綋鍓?PC 瀹屾垚 USB 璋冭瘯鎺堟潈 / 淇′换
+### USB Connect 模式
 
-浣跨敤娴佺▼锛?
-1. 鎵撳紑 Windows Receiver
-2. 纭 `Server = Running`
-3. 鐐瑰嚮 `USB Connect`
-4. Receiver 鑷姩澶勭悊 USB / ADB 缂栨帓
-5. Android 鑷姩鍒囨崲鍒?`127.0.0.1:8765` 骞惰繛涓?
-鎵€浠ヨ鐧戒簡灏辨槸锛氬鏋?USB 璋冭瘯娌″紑锛屾垨鑰呰繖鍙扮數鑴戣繕娌℃湁琚钩鏉夸俊浠伙紝USB Connect 灏变笉浼氬伐浣溿€?
-閲嶇偣鏄紝瀹冧笉鏄€滆劚绂昏皟璇曠殑鍘熺敓 USB 浼犺緭鈥濄€?
-## 浠撳簱缁撴瀯
+USB Connect 很方便，但它本质上仍然基于 `ADB reverse`。
 
-- `android_app/`: Android Studio 宸ョ▼锛屽寘鍚敭鐩?App銆乀ouchpad App 鍜屽叡浜綉缁滃眰
-- `windows_receiver_winui/`: 鎺ㄨ崘浣跨敤鐨?Windows Receiver
-- `windows_receiver/`: 鏃х増 Python Receiver
-- `build/`: 鏋勫缓涓庢墦鍖呰剼鏈?- `assets/`: 鍏变韩璧勬簮鍜岄┍鍔ㄧ浉鍏崇洰褰?- `samples/`: 甯冨眬鏍蜂緥鍜屽弬鑰冩枃浠?
-## 蹇€熷紑濮?
-### 1. 鍏堟嬁鍒?release 璧勪骇
+前提：
 
-甯哥敤鐨?bundle 涓昏鏄細
+1. Android App 已经打开
+2. USB 线支持数据传输
+3. Android 已开启 `USB 调试`
+4. 平板已经对当前这台电脑完成 USB 调试授权 / 信任
+
+流程：
+
+1. 打开 Windows Receiver
+2. 确认 `Server = Running`
+3. 点击 `USB Connect`
+4. Receiver 完成 USB / ADB 编排
+5. Android 自动切到 `127.0.0.1:8765` 并发起连接
+
+所以，是的：如果 USB 调试没开，或者平板还没信任这台电脑，`USB Connect` 就不会工作。
+
+另外要说明，这不是“脱离调试的原生 USB 传输”。
+
+## 仓库结构
+
+- `android_app/`：Android Studio 工程，包含键盘 App、touchpad App 和共享网络层
+- `windows_receiver_winui/`：推荐使用的 Windows Receiver
+- `windows_receiver/`：旧版 Python Receiver
+- `build/`：构建和打包脚本
+- `assets/`：共享资源和驱动相关目录
+- `samples/`：示例布局和相关参考
+
+## 快速开始
+
+### 1. 获取发布资产
+
+常用的 bundle 包含：
 
 - `app-release-signed-keyboard.apk`
 - `Receiver_WinUI-win-x64.zip`
 
-鍙戝竷椤碉細[GitHub Releases](https://github.com/wtxj00789d/touchpad-keyboard-receiver-source-builds/releases)
+发布页：[GitHub Releases](https://github.com/wtxj00789d/touchpad-keyboard-receiver-source-builds/releases)
 
-### 2. 鍏堟妸 Windows 杩欒竟鍑嗗濂?
-瑙ｅ帇 WinUI zip锛屽苟淇濇寔鏁翠釜鐩綍缁撴瀯瀹屾暣銆?
-褰撳墠 WinUI zip 鏄交閲?`framework-dependent` 鐗堟湰锛屾墍浠ョ洰鏍囨満鍣ㄦ渶濂藉凡缁忚濂斤細
+### 2. 准备 Windows 端
+
+解压 WinUI 压缩包时，请保持目录结构完整。
+
+当前这个 WinUI 包是轻量 `framework-dependent` 构建，所以目标机器最好已经安装：
 
 - `.NET 8 Desktop Runtime (x64)`
 - `Windows App Runtime / Windows App SDK Runtime 1.8 (x64)`
 
-濡傛灉浣犳兂瑕佲€滀涪鍒颁竴鍙板共鍑€ Windows 鏈哄櫒涓婂氨鐩存帴璺戔€濈殑鐗堟湰锛岄偅灏卞埆鐢ㄩ粯璁?release 璧勪骇锛岃€屾槸鏀圭敤 self-contained 鏋勫缓銆?
-### 3. 鍚姩 Windows Receiver
+如果你需要的是“扔到一台干净 Windows 机器上就直接跑”的版本，请改用 self-contained 构建。
 
-杩愯锛?
+### 3. 启动 Windows Receiver
+
+运行：
+
 - `Receiver_WinUI.exe`
 
-### 4. 鎵撳紑 Android App
+### 4. 打开 Android App
 
-鍦ㄥ钩鏉夸笂瀹夎骞舵墦寮€閿洏 App銆?
-褰撳墠鎺ㄨ崘鐨勯粯璁ゆ柟寮忔槸锛氬湪浣犵偣鍑?`USB Connect` 涔嬪墠锛孉ndroid App 宸茬粡澶勪簬鎵撳紑鐘舵€併€?
-## 浠庢簮鐮佹瀯寤?
-### Windows Receiver锛圵inUI锛屾帹鑽愶級
+在平板上安装键盘 App 并打开它。
 
-- PowerShell: `E:\work\repo\build\build_windows_winui.ps1`
-- PowerShell 鑷寘鍚瀯寤? `E:\work\repo\build\build_windows_winui.ps1 -SelfContained`
-- Batch: `E:\work\repo\build\build_windows_winui.bat`
+推荐的默认流程是：在使用 `USB Connect` 之前，Android App 已经处于打开状态。
 
-榛樿杞婚噺杈撳嚭锛?
+## 从源码构建
+
+### Windows Receiver（推荐用 WinUI）
+
+- PowerShell：`E:\work\repo\build\build_windows_winui.ps1`
+- PowerShell 自包含构建：`E:\work\repo\build\build_windows_winui.ps1 -SelfContained`
+- Batch：`E:\work\repo\build\build_windows_winui.bat`
+
+默认轻量输出：
+
 - `windows_receiver_winui/dist/`
 
-鑷寘鍚緭鍑猴細
+自包含输出：
 
 - `windows_receiver_winui/dist-self-contained/`
 
 ### Android App
 
-- Debug 閿洏鍖? `E:\work\repo\build\build_android.ps1 -BuildType Debug -Module app`
-- Release 閿洏鍖? `E:\work\repo\build\build_android.ps1 -BuildType Release -Module app`
-- 宸茬鍚?Release APK: `E:\work\repo\build\sign_android_release.ps1 -Module app`
+- Debug 键盘 App：`E:\work\repo\build\build_android.ps1 -BuildType Debug -Module app`
+- Release 键盘 App：`E:\work\repo\build\build_android.ps1 -BuildType Release -Module app`
+- 已签名 Release APK：`E:\work\repo\build\sign_android_release.ps1 -Module app`
 
-### 鏃х増 Python Receiver
+已签名产物：
 
-鏃х増 Python Receiver 浠嶇劧淇濈暀鍦?`windows_receiver/` 閲岋紝涓嶈繃鐜板湪鏇存帹鑽愮洿鎺ョ敤 WinUI Receiver銆?
-## 琛ュ厖璇存槑
+- `android_app/app/build/outputs/apk/release/app-release-signed.apk`
 
-- Touchpad 杩樺湪锛屽彧鏄繖娆′笉鏄富瑙?- 楹﹀厠椋庨摼璺篃杩樺湪锛屾部鐢ㄥ綋鍓?Alpha 鐨勫疄鐜版柟寮?- 鍔ㄤ綔鎵ц鑳藉姏寤鸿鍙湪鍙俊鐜閲屼娇鐢?
+### 旧版 Python Receiver
+
+旧版 Python Receiver 仍保留在 `windows_receiver/` 中，但目前推荐使用 WinUI Receiver 作为 Windows 端宿主。
+
+## 说明
+
+- `touchpad` 仍然在仓库里，只是不是当前这个 release 的主角
+- 麦克风链路仍然沿用当前 Alpha 的实现
+- 动作执行默认应只在受信任环境中使用
