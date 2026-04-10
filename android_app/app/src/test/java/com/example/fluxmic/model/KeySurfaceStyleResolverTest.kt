@@ -7,7 +7,7 @@ class KeySurfaceStyleResolverTest {
     @Test
     fun lightModeKeepsGradientDepthInsteadOfFlatWhiteFill() {
         val style = KeySurfaceStyleResolver.resolve(
-            mode = KeySurfaceMode.LIGHT,
+            mode = GlassToneMode.LIGHT,
             selected = false,
             lockOn = false,
             active = false
@@ -21,13 +21,13 @@ class KeySurfaceStyleResolverTest {
     @Test
     fun lightModePressedStateBrightensBorderWithoutLosingGradient() {
         val base = KeySurfaceStyleResolver.resolve(
-            mode = KeySurfaceMode.LIGHT,
+            mode = GlassToneMode.LIGHT,
             selected = false,
             lockOn = false,
             active = false
         )
         val pressed = KeySurfaceStyleResolver.resolve(
-            mode = KeySurfaceMode.LIGHT,
+            mode = GlassToneMode.LIGHT,
             selected = true,
             lockOn = false,
             active = false

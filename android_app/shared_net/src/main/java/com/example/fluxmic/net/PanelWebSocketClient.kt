@@ -1,4 +1,4 @@
-﻿package com.example.fluxmic.net
+package com.example.fluxmic.net
 
 import android.util.Log
 import com.example.fluxmic.model.StateMessage

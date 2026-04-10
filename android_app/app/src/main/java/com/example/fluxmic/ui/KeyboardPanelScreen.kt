@@ -1,4 +1,4 @@
-﻿package com.example.fluxmic.ui
+package com.example.fluxmic.ui
 
 import android.content.Context
 import android.content.Intent
@@ -18,15 +18,11 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Indication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.indication
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -46,12 +42,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.rememberRipple
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -83,6 +74,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -103,8 +95,11 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.example.fluxmic.model.BackgroundVideoLayoutPolicy
 import com.example.fluxmic.model.BackgroundVideoLayoutState
+import com.example.fluxmic.model.GlassControlSurface
+import com.example.fluxmic.model.GlassControlTextTreatment
+import com.example.fluxmic.model.GlassThemeTokens
+import com.example.fluxmic.model.GlassToneMode
 import com.example.fluxmic.model.KeyConfig
-import com.example.fluxmic.model.KeySurfaceMode
 import com.example.fluxmic.model.KeySurfaceStyleResolver
 import com.example.fluxmic.model.KeyboardBehavior
 import com.example.fluxmic.model.KeyboardLayerState
@@ -113,6 +108,9 @@ import com.example.fluxmic.model.OverlayModel
 import com.example.fluxmic.model.PageConfig
 import com.example.fluxmic.model.ServerAddressFormatter
 import com.example.fluxmic.model.UiState
+import com.example.fluxmic.ui.components.DefaultGlassBackground
+import com.example.fluxmic.ui.components.GlassActionButton
+import com.example.fluxmic.ui.components.GlassSlider
 import com.example.fluxmic.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -131,9 +129,8 @@ import kotlin.math.sin
 private const val PREFS_NAME = "fluxmic_prefs"
 private const val PREF_BG_MEDIA_URI = "background_media_uri"
 private const val PREF_BG_VIDEO_URI = "background_video_uri" // legacy key for migration
-private const val PREF_TEXT_MODE = "key_text_mode"
+private const val PREF_TONE_MODE = "key_text_mode"
 private const val PREF_RIPPLE_MODE = "ripple_quality_mode"
-private const val GLASS_BUTTON_ALPHA = 0.10f
 private val OVERLAY_TEXT_SHADOW = Shadow(
     color = Color.Black.copy(alpha = 0.82f),
     offset = Offset(0f, 1.6f),
@@ -157,20 +154,6 @@ private data class GlobalRipplePulse(
     val alphaAnim: Animatable<Float, AnimationVector1D>,
     val coreAlphaAnim: Animatable<Float, AnimationVector1D>
 )
-
-private enum class KeyTextMode {
-    NORMAL,
-    LIGHT,
-    DARK;
-
-    fun next(): KeyTextMode {
-        return when (this) {
-            NORMAL -> LIGHT
-            LIGHT -> DARK
-            DARK -> NORMAL
-        }
-    }
-}
 
 private enum class RippleQualityMode(
     val title: String,
@@ -202,8 +185,8 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
     var showUrlBar by rememberSaveable { mutableStateOf(true) }
     var keyboardHeightPx by remember { mutableIntStateOf(0) }
     var customBackgroundUri by rememberSaveable { mutableStateOf(loadBackgroundMediaUri(context)) }
-    var keyTextMode by rememberSaveable {
-        mutableStateOf(loadKeyTextMode(context))
+    var glassToneMode by rememberSaveable {
+        mutableStateOf(loadGlassToneMode(context))
     }
     var rippleQualityMode by rememberSaveable {
         mutableStateOf(loadRippleQualityMode(context))
@@ -234,9 +217,10 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        MediaOrGradientBackground(
+        MediaBackgroundWithToneFilter(
             modifier = Modifier.fillMaxSize(),
-            customBackgroundUri = customBackgroundUri
+            customBackgroundUri = customBackgroundUri,
+            toneMode = glassToneMode
         )
         Box(
             modifier = Modifier
@@ -258,7 +242,7 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
                         page = page,
                         stateFlags = uiState.stateFlags,
                         layerState = uiState.keyboardLayerState,
-                        keyTextMode = keyTextMode,
+                        glassToneMode = glassToneMode,
                         rippleQualityMode = rippleQualityMode,
                         onKeyboardHeightChanged = { keyboardHeightPx = it },
                         onKeyDown = { viewModel.onKeyPressed(it) },
@@ -275,7 +259,7 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
                         page = page,
                         stateFlags = uiState.stateFlags,
                         layerState = uiState.keyboardLayerState,
-                        keyTextMode = keyTextMode,
+                        glassToneMode = glassToneMode,
                         rippleQualityMode = rippleQualityMode,
                         onTrigger = { key, longPress ->
                             viewModel.onKeyTriggered(key, longPress)
@@ -317,10 +301,10 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
                                 customBackgroundUri = null
                                 saveBackgroundMediaUri(context, null)
                             },
-                            keyTextMode = keyTextMode,
-                            onTextModeToggle = {
-                                keyTextMode = keyTextMode.next()
-                                saveKeyTextMode(context, keyTextMode)
+                            glassToneMode = glassToneMode,
+                            onToneModeToggle = {
+                                glassToneMode = glassToneMode.next()
+                                saveGlassToneMode(context, glassToneMode)
                             },
                             rippleQualityMode = rippleQualityMode,
                             onRippleModeToggle = {
@@ -332,13 +316,20 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
                         GlassTabBar(
                             pages = uiState.pages,
                             selectedPageIndex = uiState.selectedPageIndex,
+                            toneMode = glassToneMode,
                             onSelect = { viewModel.selectPage(it) }
                         )
                     }
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No layout loaded")
+                    Text(
+                        text = "No layout loaded",
+                        style = overlayReadableStyle(
+                            base = MaterialTheme.typography.titleMedium,
+                            toneMode = glassToneMode
+                        )
+                    )
                 }
             }
         }
@@ -349,13 +340,28 @@ fun KeyboardPanelScreen(viewModel: MainViewModel) {
 private fun GlassTabBar(
     pages: List<PageConfig>,
     selectedPageIndex: Int,
+    toneMode: GlassToneMode,
     onSelect: (Int) -> Unit
 ) {
+    val idlePalette = remember(toneMode) {
+        GlassThemeTokens.controlPalette(
+            mode = toneMode,
+            surface = GlassControlSurface.BUTTON,
+            active = false
+        )
+    }
+    val activePalette = remember(toneMode) {
+        GlassThemeTokens.controlPalette(
+            mode = toneMode,
+            surface = GlassControlSurface.BUTTON,
+            active = true
+        )
+    }
     Box(modifier = Modifier.fillMaxWidth()) {
         TabRow(
             selectedTabIndex = selectedPageIndex,
             containerColor = Color.Transparent,
-            contentColor = Color.White,
+            contentColor = overlayTextColor(toneMode),
             divider = {},
             indicator = {}
         ) {
@@ -364,8 +370,8 @@ private fun GlassTabBar(
                 Tab(
                     selected = selected,
                     onClick = { onSelect(idx) },
-                    selectedContentColor = Color.White,
-                    unselectedContentColor = Color.White.copy(alpha = 0.78f),
+                    selectedContentColor = overlayTextColor(toneMode),
+                    unselectedContentColor = overlayTextColor(toneMode, alpha = 0.78f),
                     text = {
                         Box(
                             modifier = Modifier
@@ -374,15 +380,15 @@ private fun GlassTabBar(
                                     brush = if (selected) {
                                         Brush.verticalGradient(
                                             colors = listOf(
-                                                Color.White.copy(alpha = GLASS_BUTTON_ALPHA + 0.08f),
-                                                Color.White.copy(alpha = GLASS_BUTTON_ALPHA + 0.02f)
+                                                Color.White.copy(alpha = activePalette.fillAlpha + 0.03f),
+                                                Color.White.copy(alpha = activePalette.fillAlpha * 0.62f)
                                             )
                                         )
                                     } else {
                                         Brush.verticalGradient(
                                             colors = listOf(
-                                                Color.White.copy(alpha = GLASS_BUTTON_ALPHA),
-                                                Color.White.copy(alpha = GLASS_BUTTON_ALPHA)
+                                                Color.White.copy(alpha = idlePalette.fillAlpha * 0.92f),
+                                                Color.White.copy(alpha = idlePalette.fillAlpha * 0.56f)
                                             )
                                         )
                                     },
@@ -390,7 +396,11 @@ private fun GlassTabBar(
                                 )
                                 .border(
                                     width = 1.dp,
-                                    color = if (selected) Color.White.copy(alpha = 0.30f) else Color.White.copy(alpha = 0.18f),
+                                    color = if (selected) {
+                                        Color.White.copy(alpha = activePalette.borderAlpha)
+                                    } else {
+                                        Color.White.copy(alpha = idlePalette.borderAlpha)
+                                    },
                                     shape = RoundedCornerShape(10.dp)
                                 )
                                 .padding(vertical = 8.dp)
@@ -400,7 +410,8 @@ private fun GlassTabBar(
                                 modifier = Modifier.align(Alignment.Center),
                                 style = overlayReadableStyle(
                                     base = MaterialTheme.typography.labelLarge,
-                                    color = if (selected) Color.White else Color.White.copy(alpha = 0.86f)
+                                    toneMode = toneMode,
+                                    alpha = if (selected) 1f else 0.86f
                                 ),
                                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
                             )
@@ -418,14 +429,54 @@ private enum class BackgroundSourceKind {
     UNKNOWN
 }
 
-private fun overlayReadableStyle(base: TextStyle, color: Color): TextStyle {
-    return base.copy(color = color, shadow = OVERLAY_TEXT_SHADOW)
+private fun overlayTextColor(toneMode: GlassToneMode, alpha: Float = 1f): Color {
+    val treatment = GlassThemeTokens.controlPalette(
+        mode = toneMode,
+        surface = GlassControlSurface.BUTTON,
+        active = false
+    ).textTreatment
+    return when (treatment) {
+        GlassControlTextTreatment.DARK -> Color(0xFF182434).copy(alpha = alpha)
+        GlassControlTextTreatment.LIGHT_WITH_SHADOW -> Color.White.copy(alpha = 0.96f * alpha)
+        GlassControlTextTreatment.LIGHT_PLAIN -> Color.White.copy(alpha = 0.90f * alpha)
+    }
+}
+
+private fun overlayTextShadow(toneMode: GlassToneMode, alpha: Float = 1f): Shadow? {
+    val treatment = GlassThemeTokens.controlPalette(
+        mode = toneMode,
+        surface = GlassControlSurface.BUTTON,
+        active = false
+    ).textTreatment
+    return when (treatment) {
+        GlassControlTextTreatment.DARK -> Shadow(
+            color = Color.White.copy(alpha = 0.42f * alpha),
+            offset = Offset.Zero,
+            blurRadius = 2.4f
+        )
+        GlassControlTextTreatment.LIGHT_WITH_SHADOW -> OVERLAY_TEXT_SHADOW.copy(
+            color = OVERLAY_TEXT_SHADOW.color.copy(alpha = 0.82f * alpha)
+        )
+        GlassControlTextTreatment.LIGHT_PLAIN -> null
+    }
+}
+
+private fun overlayReadableStyle(
+    base: TextStyle,
+    toneMode: GlassToneMode,
+    alpha: Float = 1f
+): TextStyle {
+    return base.copy(
+        color = overlayTextColor(toneMode, alpha),
+        shadow = overlayTextShadow(toneMode, alpha)
+    )
 }
 
 @Composable
-private fun MediaOrGradientBackground(
+private fun MediaBackgroundWithToneFilter(
     modifier: Modifier = Modifier,
-    customBackgroundUri: String?
+    customBackgroundUri: String?,
+    toneMode: GlassToneMode
 ) {
     val context = LocalContext.current
     val customUri = remember(customBackgroundUri) { customBackgroundUri?.let(Uri::parse) }
@@ -438,51 +489,61 @@ private fun MediaOrGradientBackground(
         }
     }
 
-    if (customReadable && customUri != null && customKind == BackgroundSourceKind.IMAGE) {
-        AndroidView(
-            factory = { ctx ->
-                ImageView(ctx).apply {
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                    adjustViewBounds = false
-                }
-            },
-            update = { imageView ->
-                imageView.setImageURI(customUri)
-            },
-            modifier = modifier
+    val imageUri = if (customReadable && customUri != null && customKind == BackgroundSourceKind.IMAGE) {
+        customUri
+    } else {
+        null
+    }
+    val videoUri = if (customReadable && customUri != null && customKind == BackgroundSourceKind.VIDEO) {
+        customUri
+    } else {
+        null
+    }
+
+    if (imageUri != null) {
+        Box(modifier = modifier) {
+            AndroidView(
+                factory = { ctx ->
+                    ImageView(ctx).apply {
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        adjustViewBounds = false
+                    }
+                },
+                update = { imageView ->
+                    imageView.setImageURI(imageUri)
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+            DefaultGlassBackground(
+                modifier = Modifier.fillMaxSize(),
+                toneMode = toneMode,
+                hasCustomMedia = true
+            )
+        }
+        return
+    }
+
+    if (videoUri == null) {
+        DefaultGlassBackground(
+            modifier = modifier,
+            toneMode = toneMode,
+            hasCustomMedia = false
         )
         return
     }
 
-    val hasAssetVideo = remember {
-        runCatching {
-            context.assets.openFd("background.mp4").close()
-            true
-        }.getOrElse { false }
-    }
-
-    val mediaUri = when {
-        customReadable && customUri != null && customKind == BackgroundSourceKind.VIDEO -> customUri
-        hasAssetVideo -> Uri.parse("asset:///background.mp4")
-        else -> null
-    }
-
-    if (mediaUri == null) {
-        GradientBackground(modifier = modifier)
-        return
-    }
-
-    val player = remember(mediaUri.toString(), context) {
+    val player = remember(videoUri.toString(), context) {
         ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(mediaUri))
+            setMediaItem(MediaItem.fromUri(videoUri))
             repeatMode = Player.REPEAT_MODE_ALL
             volume = 0f
             playWhenReady = true
         }
     }
-    var layoutRefreshTick by remember(mediaUri.toString()) { mutableIntStateOf(0) }
-    var appliedLayoutRefreshTick by remember(mediaUri.toString()) { mutableIntStateOf(0) }
-    var layoutState by remember(mediaUri.toString()) { mutableStateOf(BackgroundVideoLayoutState()) }
+    var layoutRefreshTick by remember(videoUri.toString()) { mutableIntStateOf(0) }
+    var appliedLayoutRefreshTick by remember(videoUri.toString()) { mutableIntStateOf(0) }
+    var hasRenderedFirstFrame by remember(videoUri.toString()) { mutableStateOf(false) }
+    var layoutState by remember(videoUri.toString()) { mutableStateOf(BackgroundVideoLayoutState()) }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) {
@@ -499,6 +560,7 @@ private fun MediaOrGradientBackground(
             }
 
             override fun onRenderedFirstFrame() {
+                hasRenderedFirstFrame = true
                 val currentSize = player.videoSize
                 val result = BackgroundVideoLayoutPolicy.reduce(
                     previousState = layoutState,
@@ -520,7 +582,14 @@ private fun MediaOrGradientBackground(
     }
 
     Box(modifier = modifier) {
-        GradientBackground(modifier = Modifier.fillMaxSize())
+        if (!hasRenderedFirstFrame) {
+            DefaultGlassBackground(
+                modifier = Modifier.fillMaxSize(),
+                toneMode = toneMode,
+                hasCustomMedia = false
+            )
+        }
+
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -549,25 +618,16 @@ private fun MediaOrGradientBackground(
                     }
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = if (hasRenderedFirstFrame) 1f else 0f }
+        )
+        DefaultGlassBackground(
+            modifier = Modifier.fillMaxSize(),
+            toneMode = toneMode,
+            hasCustomMedia = true
         )
     }
-}
-
-@Composable
-private fun GradientBackground(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.background(
-            Brush.linearGradient(
-                colors = listOf(
-                    Color(0xFF0B1D2C),
-                    Color(0xFF1C4968),
-                    Color(0xFF153046),
-                    Color(0xFF2A6F97)
-                )
-            )
-        )
-    )
 }
 
 @Composable
@@ -576,7 +636,7 @@ private fun FluxRowKeyboard(
     page: PageConfig,
     stateFlags: Map<String, Boolean>,
     layerState: KeyboardLayerState,
-    keyTextMode: KeyTextMode,
+    glassToneMode: GlassToneMode,
     rippleQualityMode: RippleQualityMode,
     onKeyboardHeightChanged: (Int) -> Unit = {},
     onKeyDown: (KeyConfig) -> Unit,
@@ -591,15 +651,12 @@ private fun FluxRowKeyboard(
     val pointerToRippleId = remember(page.id) { mutableStateMapOf<Long, Int>() }
     val keyPressCount = remember(page.id) { mutableStateMapOf<String, Int>() }
     val keyRepeatJobs = remember(page.id) { mutableStateMapOf<String, Job>() }
-    val interactionSources = remember(page.id) { mutableStateMapOf<String, MutableInteractionSource>() }
-    val activePresses = remember(page.id) { mutableStateMapOf<String, PressInteraction.Press>() }
     val keyRootOffsets = remember(page.id) { mutableStateMapOf<String, Offset>() }
     val keyRippleRadius = remember(page.id) { mutableStateMapOf<String, Float>() }
     val backgroundRipples = remember(page.id) { mutableStateListOf<GlobalRipplePulse>() }
     var nextRippleId by remember(page.id) { mutableIntStateOf(1) }
     var keyboardRootOffset by remember(page.id) { mutableStateOf(Offset.Zero) }
     val pressStartRadiusPx = with(density) { 10.dp.toPx() }
-    val ripple: Indication = rememberRipple(bounded = true)
     val repeatProfile = remember { KeyboardBehavior.defaultRepeatProfile() }
 
     DisposableEffect(page.id) {
@@ -685,7 +742,7 @@ private fun FluxRowKeyboard(
                                 key = key,
                                 selected = isPressed,
                                 active = isActive,
-                                keyTextMode = keyTextMode,
+                                glassToneMode = glassToneMode,
                                 layerState = layerState,
                                 modifier = Modifier
                                     .weight(effectiveWeight)
@@ -695,10 +752,6 @@ private fun FluxRowKeyboard(
                                         val base = min(coordinates.size.width, coordinates.size.height).toFloat()
                                         keyRippleRadius[key.id] = base * 1.38f
                                     }
-                                    .indication(
-                                        interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() },
-                                        indication = ripple
-                                    )
                                     .pointerInput(page.id, key.id) {
                                         awaitEachGesture {
                                             val down = awaitFirstDown(requireUnconsumed = false)
@@ -733,11 +786,6 @@ private fun FluxRowKeyboard(
 
                                             keyPressCount[key.id] = (keyPressCount[key.id] ?: 0) + 1
                                             if ((keyPressCount[key.id] ?: 0) == 1) {
-                                                val interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() }
-                                                val press = PressInteraction.Press(down.position)
-                                                activePresses[key.id] = press
-                                                interactionSource.tryEmit(press)
-
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 onKeyDown(key)
                                                 if (key.action.kind.name == "KEY") {
@@ -769,11 +817,6 @@ private fun FluxRowKeyboard(
                                                     if (left <= 0) {
                                                         keyPressCount.remove(key.id)
                                                         keyRepeatJobs.remove(key.id)?.cancel()
-                                                        val interactionSource = interactionSources.getOrPut(key.id) { MutableInteractionSource() }
-                                                        val press = activePresses.remove(key.id)
-                                                        if (press != null) {
-                                                            interactionSource.tryEmit(PressInteraction.Release(press))
-                                                        }
                                                         onKeyUp(key)
                                                     } else {
                                                         keyPressCount[key.id] = left
@@ -809,8 +852,8 @@ private fun OverlayCards(
     backgroundStatus: String,
     onPickBackground: () -> Unit,
     onClearBackground: () -> Unit,
-    keyTextMode: KeyTextMode,
-    onTextModeToggle: () -> Unit,
+    glassToneMode: GlassToneMode,
+    onToneModeToggle: () -> Unit,
     rippleQualityMode: RippleQualityMode,
     onRippleModeToggle: () -> Unit,
     onToggleUrlBar: () -> Unit
@@ -836,7 +879,7 @@ private fun OverlayCards(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (showUrlBar) {
-            GlassOverlayCard {
+            GlassOverlayCard(toneMode = glassToneMode) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -850,17 +893,17 @@ private fun OverlayCards(
                             ServerAddressFormatter.toDisplayValue(uiState.serverUrl)
                         },
                         expanded = uiState.addressEditorExpanded,
-                        onClick = onAddressEditorToggle
+                        onClick = onAddressEditorToggle,
+                        toneMode = glassToneMode
                     )
-                    Button(onClick = onConnectClick, modifier = Modifier.height(56.dp)) {
-                        Text(
-                            if (uiState.connected) "Disconnect" else "Connect",
-                            style = overlayReadableStyle(
-                                base = MaterialTheme.typography.labelLarge,
-                                color = Color.White
-                            )
-                        )
-                    }
+                    GlassActionButton(
+                        text = if (uiState.connected) "Disconnect" else "Connect",
+                        onClick = onConnectClick,
+                        toneMode = glassToneMode,
+                        active = uiState.connected || uiState.connecting,
+                        modifier = Modifier.height(56.dp),
+                        textStyle = MaterialTheme.typography.labelLarge
+                    )
                 }
             }
         }
@@ -875,22 +918,24 @@ private fun OverlayCards(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .heightIn(min = 126.dp)
+                    .heightIn(min = 126.dp),
+                toneMode = glassToneMode
             ) {
                 Text(
                     text = "Realtime",
                     style = overlayReadableStyle(
                         base = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.92f)
+                        toneMode = glassToneMode,
+                        alpha = 0.92f
                     ),
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OverlayMetric("Conn", uiState.statusText)
-                    OverlayMetric("Mic", "${(uiState.micLevel * 100).toInt()}%")
-                    OverlayMetric("Mute", if (uiState.mute) "On" else "Off")
-                    OverlayMetric("Layout", layoutMode.displayName)
+                    OverlayMetric("Conn", uiState.statusText, glassToneMode)
+                    OverlayMetric("Mic", "${(uiState.micLevel * 100).toInt()}%", glassToneMode)
+                    OverlayMetric("Mute", if (uiState.mute) "On" else "Off", glassToneMode)
+                    OverlayMetric("Layout", layoutMode.displayName, glassToneMode)
                 }
             }
 
@@ -898,13 +943,15 @@ private fun OverlayCards(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .heightIn(min = 126.dp)
+                    .heightIn(min = 126.dp),
+                toneMode = glassToneMode
             ) {
                 Text(
                     text = if (overlayModel.usingFallbackActions) "Context" else "Active Window",
                     style = overlayReadableStyle(
                         base = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.92f)
+                        toneMode = glassToneMode,
+                        alpha = 0.92f
                     ),
                     fontWeight = FontWeight.SemiBold
                 )
@@ -913,7 +960,7 @@ private fun OverlayCards(
                     text = overlayModel.windowTitle,
                     style = overlayReadableStyle(
                         base = MaterialTheme.typography.bodyMedium,
-                        color = Color.White
+                        toneMode = glassToneMode
                     ),
                     maxLines = 2
                 )
@@ -924,25 +971,19 @@ private fun OverlayCards(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         overlayModel.contextActions.forEach { action ->
-                            OutlinedButton(
+                            GlassActionButton(
+                                text = action.title,
                                 onClick = when (action.id) {
                                     "minimize" -> onWindowMinimize
                                     "maximize" -> onWindowMaximize
                                     "close" -> onWindowClose
                                     else -> ({})
                                 },
-                                colors = glassOutlinedButtonColors(),
-                                border = glassOutlinedBorder(),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    action.title,
-                                    style = overlayReadableStyle(
-                                        base = MaterialTheme.typography.labelMedium,
-                                        color = Color.White
-                                    )
-                                )
-                            }
+                                toneMode = glassToneMode,
+                                active = action.id == "close",
+                                modifier = Modifier.weight(1f),
+                                textStyle = MaterialTheme.typography.labelMedium
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
@@ -951,7 +992,8 @@ private fun OverlayCards(
                         text = "Quick Controls",
                         style = overlayReadableStyle(
                             base = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.82f)
+                            toneMode = glassToneMode,
+                            alpha = 0.82f
                         )
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -962,31 +1004,30 @@ private fun OverlayCards(
                         overlayModel.contextActions
                             .filter { it.id != "volume" }
                             .forEach { action ->
-                                OutlinedButton(
+                                GlassActionButton(
+                                    text = action.title,
                                     onClick = when (action.id) {
                                         "connection" -> onConnectClick
                                         "mute" -> onMuteClick
                                         else -> ({})
                                     },
-                                    colors = glassOutlinedButtonColors(),
-                                    border = glassOutlinedBorder(),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        action.title,
-                                        style = overlayReadableStyle(
-                                            base = MaterialTheme.typography.labelMedium,
-                                            color = Color.White
-                                        )
-                                    )
-                                }
+                                    toneMode = glassToneMode,
+                                    active = when (action.id) {
+                                        "connection" -> uiState.connected || uiState.connecting
+                                        "mute" -> uiState.mute
+                                        else -> false
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    textStyle = MaterialTheme.typography.labelMedium
+                                )
                             }
                     }
                     if (overlayModel.showVolumeCapsule) {
                         Spacer(modifier = Modifier.height(6.dp))
                         GlassVolumeCapsule(
                             systemVolume = overlayModel.volumeLevel,
-                            onVolumeChange = onVolumeChange
+                            onVolumeChange = onVolumeChange,
+                            toneMode = glassToneMode
                         )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
@@ -995,7 +1036,8 @@ private fun OverlayCards(
                     text = if (uiState.lastEvent.isNotBlank()) "Event: ${uiState.lastEvent}" else "Event: -",
                     style = overlayReadableStyle(
                         base = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.85f)
+                        toneMode = glassToneMode,
+                        alpha = 0.85f
                     ),
                     maxLines = 2
                 )
@@ -1005,13 +1047,15 @@ private fun OverlayCards(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .heightIn(min = 126.dp)
+                    .heightIn(min = 126.dp),
+                toneMode = glassToneMode
             ) {
                 Text(
                     text = "Settings",
                     style = overlayReadableStyle(
                         base = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.92f)
+                        toneMode = glassToneMode,
+                        alpha = 0.92f
                     ),
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1021,101 +1065,64 @@ private fun OverlayCards(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        OutlinedButton(
+                        GlassActionButton(
+                            text = "Import BG",
                             onClick = onPickBackground,
-                            colors = glassOutlinedButtonColors(),
-                            border = glassOutlinedBorder(),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                "Import BG",
-                                style = overlayReadableStyle(
-                                    base = MaterialTheme.typography.labelLarge,
-                                    color = Color.White
-                                )
-                            )
-                        }
-                        OutlinedButton(
+                            toneMode = glassToneMode,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.labelLarge
+                        )
+                        GlassActionButton(
+                            text = "Clear BG",
                             onClick = onClearBackground,
+                            toneMode = glassToneMode,
                             enabled = hasCustomBackground,
-                            colors = glassOutlinedButtonColors(),
-                            border = glassOutlinedBorder(),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                "Clear BG",
-                                style = overlayReadableStyle(
-                                    base = MaterialTheme.typography.labelLarge,
-                                    color = Color.White
-                                )
-                            )
-                        }
-                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.labelLarge
+                        )
+                        GlassActionButton(
+                            text = "Layout: ${layoutMode.displayName}",
                             onClick = onLayoutModeToggle,
-                            colors = glassOutlinedButtonColors(),
-                            border = glassOutlinedBorder(),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                "Layout: ${layoutMode.displayName}",
-                                style = overlayReadableStyle(
-                                    base = MaterialTheme.typography.labelLarge,
-                                    color = Color.White
-                                )
-                            )
-                        }
-                        OutlinedButton(
-                            onClick = onTextModeToggle,
-                            colors = glassOutlinedButtonColors(),
-                            border = glassOutlinedBorder(),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                "Text: ${keyTextMode.name}",
-                                style = overlayReadableStyle(
-                                    base = MaterialTheme.typography.labelLarge,
-                                    color = Color.White
-                                )
-                            )
-                        }
+                            toneMode = glassToneMode,
+                            active = layoutMode == KeyboardLayoutMode.LAYOUT_68,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.labelLarge
+                        )
+                        GlassActionButton(
+                            text = "Tone: ${glassToneMode.name}",
+                            onClick = onToneModeToggle,
+                            toneMode = glassToneMode,
+                            active = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.labelLarge
+                        )
                     }
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        OutlinedButton(
+                        GlassActionButton(
+                            text = if (showUrlBar) "Hide Address" else "Show Address",
                             onClick = onToggleUrlBar,
-                            colors = glassOutlinedButtonColors(),
-                            border = glassOutlinedBorder(),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                if (showUrlBar) "Hide Address" else "Show Address",
-                                style = overlayReadableStyle(
-                                    base = MaterialTheme.typography.labelLarge,
-                                    color = Color.White
-                                )
-                            )
-                        }
-                        OutlinedButton(
+                            toneMode = glassToneMode,
+                            active = showUrlBar,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.labelLarge
+                        )
+                        GlassActionButton(
+                            text = "Ripple: ${rippleQualityMode.title}",
                             onClick = onRippleModeToggle,
-                            colors = glassOutlinedButtonColors(),
-                            border = glassOutlinedBorder(),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                "Ripple: ${rippleQualityMode.title}",
-                                style = overlayReadableStyle(
-                                    base = MaterialTheme.typography.labelLarge,
-                                    color = Color.White
-                                )
-                            )
-                        }
+                            toneMode = glassToneMode,
+                            active = rippleQualityMode == RippleQualityMode.HIGH,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.labelLarge
+                        )
                         Text(
                             text = backgroundStatus,
                             style = overlayReadableStyle(
                                 base = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.88f)
+                                toneMode = glassToneMode,
+                                alpha = 0.88f
                             )
                         )
                     }
@@ -1130,28 +1137,56 @@ private fun InlineAddressEditorCard(
     displayValue: String,
     expanded: Boolean,
     onClick: () -> Unit,
+    toneMode: GlassToneMode,
     modifier: Modifier = Modifier
 ) {
+    val idlePalette = remember(toneMode) {
+        GlassThemeTokens.controlPalette(
+            mode = toneMode,
+            surface = GlassControlSurface.BUTTON,
+            active = false
+        )
+    }
+    val activePalette = remember(toneMode) {
+        GlassThemeTokens.controlPalette(
+            mode = toneMode,
+            surface = GlassControlSurface.BUTTON,
+            active = true
+        )
+    }
     val borderColor by animateColorAsState(
         targetValue = if (expanded) {
-            Color.White.copy(alpha = 0.34f)
+            Color.White.copy(alpha = activePalette.borderAlpha)
         } else {
-            Color.White.copy(alpha = 0.18f)
+            Color.White.copy(alpha = idlePalette.borderAlpha)
         },
         label = "address-editor-border"
     )
-    val backgroundColor by animateColorAsState(
+    val topFillColor by animateColorAsState(
         targetValue = if (expanded) {
-            Color.White.copy(alpha = 0.11f)
+            Color.White.copy(alpha = activePalette.fillAlpha + 0.02f)
         } else {
-            Color.White.copy(alpha = 0.05f)
+            Color.White.copy(alpha = idlePalette.fillAlpha * 0.86f)
         },
-        label = "address-editor-bg"
+        label = "address-editor-bg-top"
+    )
+    val bottomFillColor by animateColorAsState(
+        targetValue = if (expanded) {
+            Color.White.copy(alpha = activePalette.fillAlpha * 0.56f)
+        } else {
+            Color.White.copy(alpha = idlePalette.fillAlpha * 0.42f)
+        },
+        label = "address-editor-bg-bottom"
     )
 
     Column(
         modifier = modifier
-            .background(backgroundColor, RoundedCornerShape(16.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(topFillColor, bottomFillColor)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
             .border(1.dp, borderColor, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -1161,14 +1196,15 @@ private fun InlineAddressEditorCard(
             text = if (expanded) "Server Address · Editing" else "Server Address",
             style = overlayReadableStyle(
                 base = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.88f)
+                toneMode = toneMode,
+                alpha = 0.88f
             )
         )
         Text(
             text = displayValue.ifBlank { "127.0.0.1:8765" },
             style = overlayReadableStyle(
                 base = MaterialTheme.typography.titleMedium,
-                color = Color.White
+                toneMode = toneMode
             ),
             maxLines = 1
         )
@@ -1180,7 +1216,8 @@ private fun InlineAddressEditorCard(
             },
             style = overlayReadableStyle(
                 base = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.78f)
+                toneMode = toneMode,
+                alpha = 0.78f
             ),
             maxLines = 2
         )
@@ -1190,12 +1227,28 @@ private fun InlineAddressEditorCard(
 @Composable
 private fun GlassOverlayCard(
     modifier: Modifier = Modifier,
+    toneMode: GlassToneMode,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val palette = remember(toneMode) {
+        GlassThemeTokens.controlPalette(
+            mode = toneMode,
+            surface = GlassControlSurface.BUTTON,
+            active = false
+        )
+    }
     Column(
         modifier = modifier
-            .background(Color.White.copy(alpha = GLASS_BUTTON_ALPHA), RoundedCornerShape(12.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(12.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = palette.fillAlpha),
+                        Color.White.copy(alpha = palette.fillAlpha * 0.56f)
+                    )
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .border(1.dp, Color.White.copy(alpha = palette.borderAlpha), RoundedCornerShape(12.dp))
             .padding(10.dp),
         verticalArrangement = Arrangement.Top,
         content = content
@@ -1205,8 +1258,16 @@ private fun GlassOverlayCard(
 @Composable
 private fun GlassVolumeCapsule(
     systemVolume: Float,
-    onVolumeChange: (Float) -> Unit
+    onVolumeChange: (Float) -> Unit,
+    toneMode: GlassToneMode
 ) {
+    val palette = remember(toneMode) {
+        GlassThemeTokens.controlPalette(
+            mode = toneMode,
+            surface = GlassControlSurface.BUTTON,
+            active = false
+        )
+    }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var interactionTick by remember { mutableLongStateOf(0L) }
     val levelPercent = (systemVolume.coerceIn(0f, 1f) * 100).toInt()
@@ -1224,8 +1285,16 @@ private fun GlassVolumeCapsule(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
-            .background(Color.White.copy(alpha = GLASS_BUTTON_ALPHA), RoundedCornerShape(12.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = palette.fillAlpha),
+                        Color.White.copy(alpha = palette.fillAlpha * 0.56f)
+                    )
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .border(1.dp, Color.White.copy(alpha = palette.borderAlpha), RoundedCornerShape(12.dp))
             .clickable {
                 expanded = true
                 interactionTick = SystemClock.elapsedRealtime()
@@ -1242,26 +1311,27 @@ private fun GlassVolumeCapsule(
                 text = "Volume",
                 style = overlayReadableStyle(
                     base = MaterialTheme.typography.labelLarge,
-                    color = Color.White
+                    toneMode = toneMode
                 )
             )
             Text(
                 text = "$levelPercent%",
                 style = overlayReadableStyle(
                     base = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.92f)
+                    toneMode = toneMode,
+                    alpha = 0.92f
                 )
             )
         }
         if (expanded) {
-            Slider(
+            GlassSlider(
                 value = systemVolume.coerceIn(0f, 1f),
+                toneMode = toneMode,
                 onValueChange = {
                     expanded = true
                     interactionTick = SystemClock.elapsedRealtime()
                     onVolumeChange(it)
                 },
-                valueRange = 0f..1f,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -1269,20 +1339,21 @@ private fun GlassVolumeCapsule(
 }
 
 @Composable
-private fun OverlayMetric(label: String, value: String) {
+private fun OverlayMetric(label: String, value: String, toneMode: GlassToneMode) {
     Column {
         Text(
             text = label,
             style = overlayReadableStyle(
                 base = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.80f)
+                toneMode = toneMode,
+                alpha = 0.80f
             )
         )
         Text(
             text = value,
             style = overlayReadableStyle(
                 base = MaterialTheme.typography.bodyMedium,
-                color = Color.White
+                toneMode = toneMode
             ),
             fontWeight = FontWeight.SemiBold
         )
@@ -1295,7 +1366,7 @@ private fun FluxKeyGrid(
     page: PageConfig,
     stateFlags: Map<String, Boolean>,
     layerState: KeyboardLayerState,
-    keyTextMode: KeyTextMode,
+    glassToneMode: GlassToneMode,
     rippleQualityMode: RippleQualityMode,
     onTrigger: (key: KeyConfig, longPress: Boolean) -> Unit
 ) {
@@ -1422,7 +1493,7 @@ private fun FluxKeyGrid(
                             key = key,
                             selected = highlightedIndex == idx,
                             active = key?.stateKey?.let { stateFlags[it] } == true,
-                            keyTextMode = keyTextMode,
+                            glassToneMode = glassToneMode,
                             layerState = layerState,
                             modifier = Modifier.weight(1f)
                         )
@@ -1438,7 +1509,7 @@ private fun KeyTile(
     key: KeyConfig?,
     selected: Boolean,
     active: Boolean,
-    keyTextMode: KeyTextMode,
+    glassToneMode: GlassToneMode,
     layerState: KeyboardLayerState,
     modifier: Modifier = Modifier
 ) {
@@ -1452,16 +1523,9 @@ private fun KeyTile(
         animationSpec = tween(durationMillis = 140, easing = LinearOutSlowInEasing),
         label = "caps-led-alpha"
     )
-    val surfaceMode = remember(keyTextMode) {
-        when (keyTextMode) {
-            KeyTextMode.NORMAL -> KeySurfaceMode.NORMAL
-            KeyTextMode.LIGHT -> KeySurfaceMode.LIGHT
-            KeyTextMode.DARK -> KeySurfaceMode.DARK
-        }
-    }
-    val surfaceStyle = remember(surfaceMode, selected, lockOn, active) {
+    val surfaceStyle = remember(glassToneMode, selected, lockOn, active) {
         KeySurfaceStyleResolver.resolve(
-            mode = surfaceMode,
+            mode = glassToneMode,
             selected = selected,
             lockOn = lockOn,
             active = active
@@ -1479,24 +1543,32 @@ private fun KeyTile(
         targetValue = Color.White.copy(alpha = surfaceStyle.borderAlpha),
         label = "key-border"
     )
+    val pressScale by animateFloatAsState(
+        targetValue = if (selected) 0.982f else 1f,
+        animationSpec = tween(
+            durationMillis = if (selected) 52 else 88,
+            easing = if (selected) FastOutLinearInEasing else FastOutSlowInEasing
+        ),
+        label = "key-press-scale"
+    )
 
-    val (textColor, textShadow) = remember(keyTextMode) {
-        when (keyTextMode) {
-            KeyTextMode.NORMAL -> {
+    val (textColor, textShadow) = remember(glassToneMode) {
+        when (GlassThemeTokens.controlPalette(glassToneMode, GlassControlSurface.BUTTON, active = false).textTreatment) {
+            GlassControlTextTreatment.DARK -> {
+                Color(0xFF182434) to Shadow(
+                    color = Color.White.copy(alpha = 0.60f),
+                    offset = Offset.Zero,
+                    blurRadius = 2.4f
+                )
+            }
+            GlassControlTextTreatment.LIGHT_WITH_SHADOW -> {
                 Color.White to Shadow(
                     color = Color.Black.copy(alpha = 0.85f),
                     offset = Offset(0f, 1.5f),
                     blurRadius = 2.5f
                 )
             }
-            KeyTextMode.LIGHT -> {
-                Color.Black to Shadow(
-                    color = Color.White.copy(alpha = 0.95f),
-                    offset = Offset.Zero,
-                    blurRadius = 2.4f
-                )
-            }
-            KeyTextMode.DARK -> Color.White to null
+            GlassControlTextTreatment.LIGHT_PLAIN -> Color.White to null
         }
     }
     val displayLabel = remember(key, layerState) { keyDisplayLabel(key, layerState) }
@@ -1507,6 +1579,10 @@ private fun KeyTile(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                }
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(fillTopColor, fillBottomColor)
@@ -1705,30 +1781,30 @@ private fun emitGlobalRipple(
         launch {
             pulse.radiusAnim.animateTo(
                 targetValue = holdRadius,
-                animationSpec = tween(durationMillis = 80, easing = FastOutLinearInEasing)
+                animationSpec = tween(durationMillis = 62, easing = FastOutLinearInEasing)
             )
         }
         launch {
             pulse.alphaAnim.animateTo(
-                targetValue = 0.30f,
-                animationSpec = tween(durationMillis = 56, easing = FastOutLinearInEasing)
+                targetValue = 0.24f,
+                animationSpec = tween(durationMillis = 42, easing = FastOutLinearInEasing)
             )
             if (pulse.phase.value == RipplePhase.Press) {
                 pulse.alphaAnim.animateTo(
-                    targetValue = 0.20f,
-                    animationSpec = tween(durationMillis = 170, easing = LinearOutSlowInEasing)
+                    targetValue = 0.14f,
+                    animationSpec = tween(durationMillis = 112, easing = LinearOutSlowInEasing)
                 )
             }
         }
         launch {
             pulse.coreAlphaAnim.animateTo(
-                targetValue = 0.20f,
-                animationSpec = tween(durationMillis = 54, easing = FastOutLinearInEasing)
+                targetValue = 0.16f,
+                animationSpec = tween(durationMillis = 40, easing = FastOutLinearInEasing)
             )
             if (pulse.phase.value == RipplePhase.Press) {
                 pulse.coreAlphaAnim.animateTo(
                     targetValue = 0.04f,
-                    animationSpec = tween(durationMillis = 130, easing = LinearOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 96, easing = LinearOutSlowInEasing)
                 )
             }
         }
@@ -1754,22 +1830,22 @@ private fun releaseGlobalRipple(
         launch {
             pulse.radiusAnim.animateTo(
                 targetValue = pulse.maxRadius,
-                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)
             )
         }
         launch {
             pulse.alphaAnim.animateTo(
                 targetValue = 0f,
-                animationSpec = tween(durationMillis = 760, easing = LinearOutSlowInEasing)
+                animationSpec = tween(durationMillis = 520, easing = LinearOutSlowInEasing)
             )
         }
         launch {
             pulse.coreAlphaAnim.animateTo(
                 targetValue = 0f,
-                animationSpec = tween(durationMillis = 120, easing = FastOutLinearInEasing)
+                animationSpec = tween(durationMillis = 84, easing = FastOutLinearInEasing)
             )
         }
-        delay(1120)
+        delay(760)
         ripples.removeAll { it.id == rippleId }
     }
 }
@@ -1795,47 +1871,45 @@ private data class RippleRenderProfile(
     val alphaBoost: Float
 )
 
-private val WATER_RING_SPECS_OLD_HIGH = listOf(
-    RippleRingSpec(delayMs = 0f, travelMs = 420f, alphaScale = 1.12f, widthScale = 1.20f, startRadiusScale = 1.00f, irregularityFraction = 0.012f),
-    RippleRingSpec(delayMs = 70f, travelMs = 520f, alphaScale = 0.98f, widthScale = 1.08f, startRadiusScale = 1.08f, irregularityFraction = 0.014f),
-    RippleRingSpec(delayMs = 140f, travelMs = 620f, alphaScale = 0.82f, widthScale = 0.96f, startRadiusScale = 1.16f, irregularityFraction = 0.016f),
-    RippleRingSpec(delayMs = 220f, travelMs = 760f, alphaScale = 0.68f, widthScale = 0.90f, startRadiusScale = 1.22f, irregularityFraction = 0.017f)
-)
-
-private val WATER_RING_SPECS_OLD_MEDIUM = WATER_RING_SPECS_OLD_HIGH.take(3).mapIndexed { index, it ->
-    it.copy(
-        alphaScale = if (index == 0) it.alphaScale * 0.92f else it.alphaScale * 0.95f,
-        widthScale = it.widthScale * 0.94f
-    )
-}
-
-private val WATER_RING_SPECS_OLD_LOW = listOf(
-    RippleRingSpec(delayMs = 0f, travelMs = 420f, alphaScale = 1.00f, widthScale = 1.00f, startRadiusScale = 1.02f, irregularityFraction = 0.010f),
-    RippleRingSpec(delayMs = 120f, travelMs = 560f, alphaScale = 0.78f, widthScale = 0.90f, startRadiusScale = 1.13f, irregularityFraction = 0.011f)
-)
-
 private val WATER_RING_SPECS_VERY_LOW = listOf(
-    RippleRingSpec(delayMs = 0f, travelMs = 390f, alphaScale = 0.86f, widthScale = 0.92f, startRadiusScale = 1.03f, irregularityFraction = 0.009f),
-    RippleRingSpec(delayMs = 140f, travelMs = 540f, alphaScale = 0.62f, widthScale = 0.82f, startRadiusScale = 1.14f, irregularityFraction = 0.010f)
+    RippleRingSpec(delayMs = 0f, travelMs = 300f, alphaScale = 0.82f, widthScale = 0.92f, startRadiusScale = 1.03f, irregularityFraction = 0.008f),
+    RippleRingSpec(delayMs = 110f, travelMs = 390f, alphaScale = 0.56f, widthScale = 0.80f, startRadiusScale = 1.12f, irregularityFraction = 0.009f)
+)
+
+private val WATER_RING_SPECS_LOW = listOf(
+    RippleRingSpec(delayMs = 0f, travelMs = 320f, alphaScale = 0.90f, widthScale = 0.96f, startRadiusScale = 1.02f, irregularityFraction = 0.008f),
+    RippleRingSpec(delayMs = 92f, travelMs = 430f, alphaScale = 0.64f, widthScale = 0.84f, startRadiusScale = 1.10f, irregularityFraction = 0.009f)
+)
+
+private val WATER_RING_SPECS_MEDIUM = listOf(
+    RippleRingSpec(delayMs = 0f, travelMs = 340f, alphaScale = 1.00f, widthScale = 1.00f, startRadiusScale = 1.00f, irregularityFraction = 0.009f),
+    RippleRingSpec(delayMs = 74f, travelMs = 430f, alphaScale = 0.76f, widthScale = 0.90f, startRadiusScale = 1.08f, irregularityFraction = 0.010f),
+    RippleRingSpec(delayMs = 150f, travelMs = 520f, alphaScale = 0.54f, widthScale = 0.82f, startRadiusScale = 1.15f, irregularityFraction = 0.011f)
+)
+
+private val WATER_RING_SPECS_HIGH = listOf(
+    RippleRingSpec(delayMs = 0f, travelMs = 350f, alphaScale = 1.04f, widthScale = 1.04f, startRadiusScale = 1.00f, irregularityFraction = 0.009f),
+    RippleRingSpec(delayMs = 68f, travelMs = 450f, alphaScale = 0.82f, widthScale = 0.94f, startRadiusScale = 1.07f, irregularityFraction = 0.010f),
+    RippleRingSpec(delayMs = 138f, travelMs = 560f, alphaScale = 0.60f, widthScale = 0.86f, startRadiusScale = 1.14f, irregularityFraction = 0.011f)
 )
 
 private fun rippleRenderProfile(mode: RippleQualityMode): RippleRenderProfile {
     return when (mode) {
         RippleQualityMode.VERY_LOW -> RippleRenderProfile(
             ringSpecs = WATER_RING_SPECS_VERY_LOW,
-            alphaBoost = 0.90f
+            alphaBoost = 0.86f
         )
         RippleQualityMode.LOW -> RippleRenderProfile(
-            ringSpecs = WATER_RING_SPECS_VERY_LOW,
-            alphaBoost = 0.94f
+            ringSpecs = WATER_RING_SPECS_LOW,
+            alphaBoost = 0.92f
         )
         RippleQualityMode.MEDIUM -> RippleRenderProfile(
-            ringSpecs = WATER_RING_SPECS_OLD_LOW,
-            alphaBoost = 1.00f
+            ringSpecs = WATER_RING_SPECS_MEDIUM,
+            alphaBoost = 0.98f
         )
         RippleQualityMode.HIGH -> RippleRenderProfile(
-            ringSpecs = WATER_RING_SPECS_OLD_MEDIUM,
-            alphaBoost = 1.03f
+            ringSpecs = WATER_RING_SPECS_HIGH,
+            alphaBoost = 1.02f
         )
     }
 }
@@ -1976,12 +2050,12 @@ private fun BackgroundRippleLayer(
 
             val ageMs = (nowMs - pulse.startedAtMs).coerceAtLeast(0L).toFloat()
             val boostedEnvelope = when (pulse.phase.value) {
-                RipplePhase.Release -> max(envelopeAlpha, if (ageMs < 220f) 0.18f else 0f)
-                RipplePhase.Press -> max(envelopeAlpha, 0.22f)
+                RipplePhase.Release -> max(envelopeAlpha, if (ageMs < 150f) 0.12f else 0f)
+                RipplePhase.Press -> max(envelopeAlpha, 0.18f)
                 RipplePhase.Hold -> envelopeAlpha
             }
             val phaseFactor = when (pulse.phase.value) {
-                RipplePhase.Press -> 1.08f
+                RipplePhase.Press -> 1.03f
                 RipplePhase.Hold -> 1.00f
                 RipplePhase.Release -> 1.00f
             }
@@ -2003,12 +2077,12 @@ private fun BackgroundRippleLayer(
                 )
             }
 
-            val splashProgress = (ageMs / 100f).coerceIn(0f, 1f)
-            val splashAlpha = (coreAlpha * (1f - splashProgress)).coerceIn(0f, 0.08f)
+            val splashProgress = (ageMs / 84f).coerceIn(0f, 1f)
+            val splashAlpha = (coreAlpha * (1f - splashProgress)).coerceIn(0f, 0.05f)
             if (splashAlpha > 0.001f) {
                 val splashRadius = lerpFloat(
-                    start = pulse.startRadius * 0.42f,
-                    stop = pulse.startRadius * 1.08f,
+                    start = pulse.startRadius * 0.46f,
+                    stop = pulse.startRadius * 0.96f,
                     fraction = FastOutSlowInEasing.transform(splashProgress)
                 )
                 drawCircle(
@@ -2021,20 +2095,6 @@ private fun BackgroundRippleLayer(
         }
     }
 }
-
-@Composable
-private fun glassOutlinedButtonColors() = ButtonDefaults.outlinedButtonColors(
-    containerColor = Color.White.copy(alpha = GLASS_BUTTON_ALPHA),
-    contentColor = Color.White,
-    disabledContainerColor = Color.White.copy(alpha = 0.05f),
-    disabledContentColor = Color.White.copy(alpha = 0.45f)
-)
-
-@Composable
-private fun glassOutlinedBorder() = androidx.compose.foundation.BorderStroke(
-    1.dp,
-    Color.White.copy(alpha = 0.18f)
-)
 
 private fun loadBackgroundMediaUri(context: Context): String? {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -2051,9 +2111,9 @@ private fun saveBackgroundMediaUri(context: Context, uri: String?) {
 }
 
 private fun backgroundStatusText(context: Context, uri: String?): String {
-    val parsed = uri?.let(Uri::parse) ?: return "BG: Assets/Gradient"
+    val parsed = uri?.let(Uri::parse) ?: return "BG: Default Atmosphere"
     if (!isUriReadable(context, parsed)) {
-        return "BG: Assets/Gradient"
+        return "BG: Default Atmosphere"
     }
     return when (detectBackgroundSourceKind(context, parsed)) {
         BackgroundSourceKind.IMAGE -> "BG: Device Image"
@@ -2084,15 +2144,15 @@ private fun detectBackgroundSourceKind(context: Context, uri: Uri): BackgroundSo
     return BackgroundSourceKind.UNKNOWN
 }
 
-private fun loadKeyTextMode(context: Context): KeyTextMode {
+private fun loadGlassToneMode(context: Context): GlassToneMode {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    val raw = prefs.getString(PREF_TEXT_MODE, KeyTextMode.NORMAL.name) ?: KeyTextMode.NORMAL.name
-    return runCatching { KeyTextMode.valueOf(raw) }.getOrElse { KeyTextMode.NORMAL }
+    val raw = prefs.getString(PREF_TONE_MODE, GlassToneMode.NORMAL.storedValue)
+    return GlassToneMode.fromStoredValue(raw)
 }
 
-private fun saveKeyTextMode(context: Context, mode: KeyTextMode) {
+private fun saveGlassToneMode(context: Context, mode: GlassToneMode) {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    prefs.edit().putString(PREF_TEXT_MODE, mode.name).apply()
+    prefs.edit().putString(PREF_TONE_MODE, mode.storedValue).apply()
 }
 
 private fun loadRippleQualityMode(context: Context): RippleQualityMode {
