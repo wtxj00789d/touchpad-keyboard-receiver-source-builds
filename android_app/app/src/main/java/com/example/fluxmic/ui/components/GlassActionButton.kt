@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.fluxmic.model.GlassActionButtonStyle
 import com.example.fluxmic.model.GlassControlTextTreatment
+import com.example.fluxmic.model.GlassThemeVariant
 import com.example.fluxmic.model.GlassToneMode
 
 @Composable
@@ -42,20 +43,24 @@ fun GlassActionButton(
     onClick: () -> Unit,
     toneMode: GlassToneMode,
     modifier: Modifier = Modifier,
+    themeVariant: GlassThemeVariant = GlassThemeVariant.GLASS,
     active: Boolean = false,
     enabled: Boolean = true,
+    editing: Boolean = false,
     textStyle: TextStyle = MaterialTheme.typography.labelLarge,
     cornerRadius: Dp = 12.dp,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val style = remember(toneMode, active, pressed, enabled) {
+    val style = remember(toneMode, themeVariant, active, pressed, enabled, editing) {
         GlassActionButtonStyle.resolve(
             toneMode = toneMode,
+            themeVariant = themeVariant,
             active = active,
             pressed = pressed,
-            enabled = enabled
+            enabled = enabled,
+            editing = editing
         )
     }
 
@@ -149,5 +154,15 @@ fun GlassActionButton(
             text = text,
             style = textStyle.copy(color = textColor, shadow = textShadow)
         )
+        if (style.showIndicatorDot) {
+            IndicatorDot(
+                on = true,
+                toneMode = toneMode,
+                themeVariant = themeVariant,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 6.dp, end = 6.dp)
+            )
+        }
     }
 }

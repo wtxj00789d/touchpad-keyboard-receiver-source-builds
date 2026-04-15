@@ -3,10 +3,11 @@ package com.example.fluxmic.model
 enum class KeyboardLayoutMode(
     val storedValue: String,
     val assetName: String,
-    val displayName: String
+    val displayName: String,
+    val stretchesLongKeysToFillRow: Boolean
 ) {
-    LAYOUT_60("layout_60", "default.json", "60%"),
-    LAYOUT_68("layout_68", "default68.json", "68-Key");
+    LAYOUT_60("layout_60", "default.json", "60%", true),
+    LAYOUT_68("layout_68", "default68.json", "68-Key", false);
 
     fun next(): KeyboardLayoutMode {
         return when (this) {

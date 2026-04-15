@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.example.fluxmic.model.GlassSliderStyle
+import com.example.fluxmic.model.GlassThemeVariant
 import com.example.fluxmic.model.GlassToneMode
 import kotlin.math.max
 
@@ -34,6 +35,7 @@ import kotlin.math.max
 fun GlassSlider(
     value: Float,
     toneMode: GlassToneMode,
+    themeVariant: GlassThemeVariant = GlassThemeVariant.GLASS,
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
@@ -41,9 +43,10 @@ fun GlassSlider(
     var widthPx by remember { mutableFloatStateOf(1f) }
     var engaged by remember { mutableStateOf(false) }
 
-    val style = remember(toneMode, engaged, enabled) {
+    val style = remember(toneMode, themeVariant, engaged, enabled) {
         GlassSliderStyle.resolve(
             toneMode = toneMode,
+            themeVariant = themeVariant,
             engaged = engaged,
             enabled = enabled
         )

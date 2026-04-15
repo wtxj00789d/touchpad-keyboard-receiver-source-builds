@@ -15,9 +15,30 @@ data class GlassSliderStyle(
     companion object {
         fun resolve(
             toneMode: GlassToneMode,
+            themeVariant: GlassThemeVariant,
             engaged: Boolean,
             enabled: Boolean
         ): GlassSliderStyle {
+            if (themeVariant == GlassThemeVariant.BORDERLESS) {
+                val tokens = BorderlessThemeTokens.slider(
+                    toneMode = toneMode,
+                    engaged = engaged,
+                    enabled = enabled
+                )
+                return GlassSliderStyle(
+                    trackTopAlpha = tokens.trackTopAlpha,
+                    trackBottomAlpha = tokens.trackBottomAlpha,
+                    trackBorderAlpha = tokens.trackBorderAlpha,
+                    fillTopAlpha = tokens.fillTopAlpha,
+                    fillBottomAlpha = tokens.fillBottomAlpha,
+                    fillGlowAlpha = tokens.fillGlowAlpha,
+                    thumbFillAlpha = tokens.thumbFillAlpha,
+                    thumbBorderAlpha = tokens.thumbBorderAlpha,
+                    thumbGlowAlpha = tokens.thumbGlowAlpha,
+                    thumbScale = tokens.thumbScale
+                )
+            }
+
             val base = when (toneMode) {
                 GlassToneMode.LIGHT -> GlassSliderStyle(
                     trackTopAlpha = 0.20f,

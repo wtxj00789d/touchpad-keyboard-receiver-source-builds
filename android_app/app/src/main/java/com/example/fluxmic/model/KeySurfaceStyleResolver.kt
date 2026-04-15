@@ -12,10 +12,24 @@ data class KeySurfaceStyle(
 object KeySurfaceStyleResolver {
     fun resolve(
         mode: GlassToneMode,
+        themeVariant: GlassThemeVariant,
         selected: Boolean,
         lockOn: Boolean,
         active: Boolean
     ): KeySurfaceStyle {
+        if (themeVariant == GlassThemeVariant.BORDERLESS) {
+            val slot = BorderlessThemeTokens.keySlot(
+                toneMode = mode,
+                pressed = selected,
+                editing = false
+            )
+            return KeySurfaceStyle(
+                fillTopAlpha = slot.fillAlpha,
+                fillBottomAlpha = slot.fillAlpha * 0.72f,
+                borderAlpha = slot.borderAlpha
+            )
+        }
+
         return when (mode) {
             GlassToneMode.LIGHT -> when {
                 selected -> KeySurfaceStyle(fillTopAlpha = 0.145f, fillBottomAlpha = 0.075f, borderAlpha = 0.70f)

@@ -1,6 +1,8 @@
 package com.example.fluxmic.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KeyboardLayoutModeTest {
@@ -18,5 +20,11 @@ class KeyboardLayoutModeTest {
     fun cyclesBetweenSupportedModes() {
         assertEquals(KeyboardLayoutMode.LAYOUT_68, KeyboardLayoutMode.LAYOUT_60.next())
         assertEquals(KeyboardLayoutMode.LAYOUT_60, KeyboardLayoutMode.LAYOUT_68.next())
+    }
+
+    @Test
+    fun only60LayoutStretchesLongKeysToFillRow() {
+        assertTrue(KeyboardLayoutMode.LAYOUT_60.stretchesLongKeysToFillRow)
+        assertFalse(KeyboardLayoutMode.LAYOUT_68.stretchesLongKeysToFillRow)
     }
 }
